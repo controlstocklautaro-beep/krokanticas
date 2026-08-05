@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
+import "./krokanticas.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,19 +21,19 @@ export async function generateMetadata(): Promise<Metadata> {
   const imageUrl = `${protocol}://${host}/og.png`;
 
   return {
-    title: "Nexo | Gestión multiempresa",
+    title: "Krokanticas | Central de pedidos",
     description:
-      "Panel operativo multiempresa con módulos configurables para cada negocio.",
+      "Panel operativo de pedidos, cocina, stock y atención por WhatsApp para Krokanticas.",
     openGraph: {
-      title: "Nexo | Gestión multiempresa",
-      description: "Cada negocio, sus módulos y sus datos. Todo desde un mismo lugar.",
+      title: "Krokanticas | Central de pedidos",
+      description: "Pedidos confirmados, cocina, stock y atención en un solo lugar.",
       images: [{ url: imageUrl, width: 1732, height: 909, alt: "Panel multiempresa Nexo" }],
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "Nexo | Gestión multiempresa",
-      description: "Cada negocio, sus módulos y sus datos. Todo desde un mismo lugar.",
+      title: "Krokanticas | Central de pedidos",
+      description: "Pedidos confirmados, cocina, stock y atención en un solo lugar.",
       images: [imageUrl],
     },
   };

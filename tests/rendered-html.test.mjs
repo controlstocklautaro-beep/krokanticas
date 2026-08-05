@@ -17,24 +17,26 @@ const exactRamayoEndpoints = [
   "upload-media",
 ];
 
-test("defines the current Nexo multi-company dashboard", async () => {
-  const [page, layout, shell, operationalModules, hosting] = await Promise.all([
+test("defines the authenticated Krokanticas operations panel", async () => {
+  const [page, layout, panel, operationalModules, auth, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
-    readFile(new URL("app/DashboardShell.tsx", root), "utf8"),
+    readFile(new URL("app/KrokanticasPanel.tsx", root), "utf8"),
     readFile(new URL("app/components/OperationalModules.tsx", root), "utf8"),
+    readFile(new URL("app/chatgpt-auth.ts", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
   ]);
 
-  assert.match(page, /<DashboardShell\s*\/>/);
-  assert.match(layout, /Nexo \| Gestión multiempresa/);
-  assert.match(shell, /MessagesModule businessId=\{business\.id\}/);
-  assert.match(shell, /CustomersModule businessId=\{business\.id\}/);
-  assert.match(shell, /TagsModule businessId=\{business\.id\}/);
-  assert.match(shell, /FinancesModule businessId=\{business\.id\}/);
-  assert.match(shell, /MetricsModule businessId=\{business\.id\}/);
+  assert.match(page, /requireChatGPTUser/);
+  assert.match(page, /<KrokanticasPanel/);
+  assert.match(layout, /Krokanticas \| Central de pedidos/);
+  assert.match(panel, /MessagesModule businessId=\{BUSINESS_ID\}/);
+  assert.match(panel, /CustomersModule businessId=\{BUSINESS_ID\}/);
+  assert.match(panel, /function StockModule/);
+  assert.match(panel, /function KitchenModule/);
   assert.match(operationalModules, /export function MessagesModule/);
-  assert.match(operationalModules, /export function FinancesModule/);
+  assert.match(operationalModules, /address: form\.get\("address"\)/);
+  assert.match(auth, /signin-with-chatgpt/);
 
   const hostingConfig = JSON.parse(hosting);
   assert.equal(hostingConfig.d1, "DB");
@@ -65,4 +67,17 @@ test("includes persistent operational APIs and migrations", async () => {
   const migration = await readFile(new URL("drizzle/0001_mute_sleeper.sql", root), "utf8");
   assert.match(migration, /CREATE TABLE `tags`/);
   assert.match(migration, /CREATE TABLE `transactions`/);
+
+  for (const endpoint of ["create", "edit", "delete", "orders"]) {
+    const source = await readFile(new URL(`app/api/kitchen/${endpoint}/route.ts`, root), "utf8");
+    assert.match(source, /requireBusinessAccess/);
+  }
+  const stock = await readFile(new URL("app/api/stock/route.ts", root), "utf8");
+  const adjust = await readFile(new URL("app/api/stock/adjust/route.ts", root), "utf8");
+  assert.match(stock, /stock_status/);
+  assert.match(adjust, /Stock insuficiente/);
+  const krokanticasMigration = await readFile(new URL("drizzle/0002_daffy_proemial_gods.sql", root), "utf8");
+  assert.match(krokanticasMigration, /CREATE TABLE `products`/);
+  assert.match(krokanticasMigration, /CREATE TABLE `orders`/);
+  assert.match(krokanticasMigration, /ALTER TABLE `contacts` ADD `address`/);
 });

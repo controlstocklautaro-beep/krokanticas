@@ -15,6 +15,13 @@
       "when": 1785958845205,
       "tag": "0001_mute_sleeper",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785960761075,
+      "tag": "0002_daffy_proemial_gods",
+      "breakpoints": true
     }
   ]
 }

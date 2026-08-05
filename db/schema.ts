@@ -28,6 +28,7 @@ export const contacts = sqliteTable("contacts", {
   phoneNumber: text("phone_number").notNull(),
   name: text("name").notNull(),
   email: text("email"),
+  address: text("address"),
   notes: text("notes"),
   agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at").notNull(),
@@ -131,4 +132,67 @@ export const pipelineLeads = sqliteTable("pipeline_leads", {
 }, (table) => [
   index("pipeline_leads_business_column_idx").on(table.businessId, table.columnId),
   index("pipeline_leads_business_created_idx").on(table.businessId, table.createdAt),
+]);
+
+export const businessSettings = sqliteTable("business_settings", {
+  businessId: text("business_id").primaryKey(),
+  storeOpen: integer("store_open", { mode: "boolean" }).notNull().default(true),
+  delayMinutes: integer("delay_minutes").notNull().default(30),
+  courierActive: integer("courier_active", { mode: "boolean" }).notNull().default(true),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const products = sqliteTable("products", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  name: text("name").notNull(),
+  price: real("price").notNull(),
+  aliases: text("aliases").notNull().default("[]"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  stockStatus: text("stock_status").notNull().default("available"),
+  stockQuantity: integer("stock_quantity"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("products_business_name_uq").on(table.businessId, table.name),
+  index("products_business_status_idx").on(table.businessId, table.stockStatus),
+]);
+
+export const orders = sqliteTable("orders", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  contactId: text("contact_id").notNull(),
+  orderNumber: integer("order_number").notNull(),
+  customerName: text("customer_name").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  deliveryType: text("delivery_type").notNull(),
+  address: text("address"),
+  zone: text("zone"),
+  paymentMethod: text("payment_method").notNull(),
+  scheduledTime: text("scheduled_time").notNull(),
+  subtotal: real("subtotal").notNull(),
+  shippingCost: real("shipping_cost").notNull().default(0),
+  total: real("total").notNull(),
+  status: text("status").notNull().default("confirmed"),
+  notes: text("notes"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [
+  uniqueIndex("orders_business_number_uq").on(table.businessId, table.orderNumber),
+  index("orders_business_status_idx").on(table.businessId, table.status),
+  index("orders_business_contact_idx").on(table.businessId, table.contactId),
+  index("orders_business_created_idx").on(table.businessId, table.createdAt),
+]);
+
+export const orderItems = sqliteTable("order_items", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  orderId: text("order_id").notNull(),
+  productId: text("product_id"),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  unitPrice: real("unit_price").notNull(),
+  subtotal: real("subtotal").notNull(),
+}, (table) => [
+  index("order_items_business_order_idx").on(table.businessId, table.orderId),
 ]);

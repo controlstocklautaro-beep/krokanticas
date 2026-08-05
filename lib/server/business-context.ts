@@ -45,9 +45,9 @@ export async function requireBusinessAccess(
     await db.prepare("INSERT OR IGNORE INTO businesses (id, name, business_type, plan, created_at) VALUES (?, ?, ?, ?, ?)")
       .bind(
         businessId,
-        businessId === "casa-oliva" ? "Casa Oliva" : businessId === "nexo-estudio" ? "Nexo Estudio" : businessId,
-        businessId === "casa-oliva" ? "restaurant" : "services",
-        businessId === "casa-oliva" ? "pro" : "base",
+        businessId === "krokanticas" ? "Krokanticas" : businessId === "casa-oliva" ? "Casa Oliva" : businessId === "nexo-estudio" ? "Nexo Estudio" : businessId,
+        businessId === "krokanticas" || businessId === "casa-oliva" ? "restaurant" : "services",
+        businessId === "krokanticas" || businessId === "casa-oliva" ? "pro" : "base",
         now,
       ).run();
     business = { id: businessId, integration_key_hash: null };
