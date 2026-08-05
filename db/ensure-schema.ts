@@ -35,6 +35,10 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS orders_business_created_idx ON orders (business_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS order_items (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, order_id TEXT NOT NULL, product_id TEXT, product_name TEXT NOT NULL, quantity INTEGER NOT NULL, unit_price REAL NOT NULL, subtotal REAL NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS order_items_business_order_idx ON order_items (business_id, order_id)`,
+  `CREATE TABLE IF NOT EXISTS handoffs (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, contact_id TEXT, order_id TEXT, phone_number TEXT, customer_name TEXT NOT NULL, reason TEXT NOT NULL, summary TEXT NOT NULL, priority TEXT NOT NULL DEFAULT 'medium', status TEXT NOT NULL DEFAULT 'open', assigned_to TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, resolved_at INTEGER)`,
+  `CREATE INDEX IF NOT EXISTS handoffs_business_status_idx ON handoffs (business_id, status)`,
+  `CREATE INDEX IF NOT EXISTS handoffs_business_created_idx ON handoffs (business_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS handoffs_business_contact_idx ON handoffs (business_id, contact_id)`,
 ];
 
 export function ensureSchema(): Promise<void> {

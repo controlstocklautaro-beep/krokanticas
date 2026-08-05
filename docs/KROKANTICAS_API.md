@@ -45,10 +45,10 @@ También se admite `delta: -2` o `delta: 3`. Nunca se permite que la cantidad qu
 
 - `GET /api/kitchen/orders?businessId=krokanticas`: lista comandas con sus productos.
 - `POST /api/kitchen/create`: crea una comanda confirmada.
-- `PATCH /api/kitchen/edit`: edita datos o estado.
+- `PATCH /api/kitchen/edit`: edita datos, estado y productos.
 - `DELETE /api/kitchen/delete`: elimina una comanda y devuelve el stock limitado descontado.
 
-Cada comanda exige un `contactId` válido de la misma empresa. Al crearla, el servidor toma nombre, teléfono y dirección desde el contacto, valida el catálogo, calcula subtotal y total, y descuenta el stock limitado.
+Cada comanda exige un `contactId` válido de la misma empresa. Al crearla, el servidor toma nombre, teléfono y dirección desde el contacto, valida el catálogo, calcula subtotal y total, y descuenta el stock limitado. Si se envía `items` al editar, el servidor reemplaza los productos, devuelve el stock anterior, descuenta el nuevo y recalcula los importes.
 
 ```json
 {
@@ -68,6 +68,26 @@ Cada comanda exige un `contactId` válido de la misma empresa. Al crearla, el se
 ```
 
 Estados de comanda: `confirmed`, `in_kitchen`, `ready`, `delivered`, `cancelled`.
+
+## Derivaciones y reclamos
+
+- `GET /api/handoffs?businessId=krokanticas`: lista casos; admite `status=open`, `in_progress`, `resolved` o `all`.
+- `POST /api/handoffs`: crea un caso manual o desde n8n y puede asociarlo a `contactId` y `orderId`.
+- `PATCH /api/handoffs`: actualiza estado, prioridad, responsable o resumen.
+- `DELETE /api/handoffs`: elimina un caso (solo propietario o administrador).
+
+Motivos admitidos: `complaint`, `ambiguity`, `human_request`, `post_confirmation_change`, `other`. Prioridades: `low`, `medium`, `high`. Estados: `open`, `in_progress`, `resolved`.
+
+```json
+{
+  "businessId": "krokanticas",
+  "contactId": "uuid-contacto",
+  "orderId": "uuid-comanda-opcional",
+  "reason": "complaint",
+  "summary": "El cliente reclama una demora y pide hablar con una persona",
+  "priority": "high"
+}
+```
 
 ## Configuración del turno
 
@@ -102,3 +122,7 @@ Se conservan los nombres exactos de la base Ramayo:
 - `/api/upload-media`
 
 Además están disponibles `/api/chats`, `/api/messages` y `/api/tags` para las pantallas del panel.
+
+## Pendiente de conexión externa
+
+El código y las pantallas quedan preparados. Para operar en producción todavía deben configurarse fuera del panel las credenciales de WhatsApp Business, el webhook y la clave de n8n, y el proveedor del agente de IA/transcripción de audios.

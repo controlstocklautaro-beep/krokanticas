@@ -66,10 +66,50 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
   const allowedStatuses = ["confirmed", "in_kitchen", "ready", "delivered", "cancelled"];
   const status = typeof body.status === "string" && allowedStatuses.includes(body.status) ? body.status : String(current.status);
   const deliveryType = body.deliveryType === "delivery" ? "delivery" : body.deliveryType === "pickup" ? "pickup" : String(current.delivery_type);
-  const shippingCost = body.shippingCost === undefined ? Number(current.shipping_cost) : Math.max(0, Number(body.shippingCost));
-  await db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, shipping_cost = ?, total = subtotal + ?, status = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" ? "transfer" : body.paymentMethod === "cash" ? "cash" : current.payment_method, body.scheduledTime === undefined ? current.scheduled_time : String(body.scheduledTime || "Ahora"), shippingCost, shippingCost, status, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, Date.now(), id, businessId).run();
-  return { id, status };
+  const requestedShippingCost = body.shippingCost === undefined ? Number(current.shipping_cost) : Math.max(0, Number(body.shippingCost));
+  const shippingCost = deliveryType === "delivery" ? requestedShippingCost : 0;
+  const now = Date.now();
+  let subtotal = Number(current.subtotal);
+  const statements = [];
+
+  if (Array.isArray(body.items)) {
+    if (body.items.length === 0) throw new ApiError("La comanda necesita productos", 400);
+    const grouped = new Map<string, number>();
+    for (const raw of body.items as OrderItemInput[]) {
+      if (!raw.productId) throw new ApiError("Producto inválido", 400);
+      const quantity = Math.max(1, Math.floor(Number(raw.quantity ?? 0)));
+      grouped.set(raw.productId, (grouped.get(raw.productId) ?? 0) + quantity);
+    }
+    const oldItems = await db.prepare(`SELECT oi.product_id, oi.quantity, p.stock_status, p.stock_quantity FROM order_items oi LEFT JOIN products p ON p.id = oi.product_id AND p.business_id = oi.business_id WHERE oi.order_id = ? AND oi.business_id = ?`).bind(id, businessId).all<{ product_id: string | null; quantity: number; stock_status: string | null; stock_quantity: number | null }>();
+    const oldQuantities = new Map<string, number>();
+    for (const item of oldItems.results) if (item.product_id) oldQuantities.set(item.product_id, (oldQuantities.get(item.product_id) ?? 0) + Number(item.quantity));
+
+    const prepared: { productId: string; name: string; quantity: number; price: number; subtotal: number; limited: boolean }[] = [];
+    for (const [productId, quantity] of grouped) {
+      const product = await db.prepare("SELECT id, name, price, stock_status, stock_quantity FROM products WHERE id = ? AND business_id = ? AND active = 1").bind(productId, businessId).first<{ id: string; name: string; price: number; stock_status: string; stock_quantity: number | null }>();
+      if (!product) throw new ApiError("Una variedad no existe o está desactivada", 409);
+      const limited = product.stock_status === "limited" || product.stock_status === "soldout";
+      const available = Number(product.stock_quantity ?? 0) + (limited ? Number(oldQuantities.get(productId) ?? 0) : 0);
+      if (limited && available < quantity) throw new ApiError(`Stock insuficiente de ${product.name}`, 409);
+      prepared.push({ productId, name: product.name, quantity, price: Number(product.price), subtotal: Number(product.price) * quantity, limited });
+    }
+    subtotal = prepared.reduce((sum, item) => sum + item.subtotal, 0);
+    for (const item of oldItems.results) {
+      if (item.product_id && (item.stock_status === "limited" || item.stock_status === "soldout")) {
+        statements.push(db.prepare("UPDATE products SET stock_quantity = COALESCE(stock_quantity, 0) + ?, stock_status = 'limited', updated_at = ? WHERE id = ? AND business_id = ?").bind(item.quantity, now, item.product_id, businessId));
+      }
+    }
+    statements.push(db.prepare("DELETE FROM order_items WHERE order_id = ? AND business_id = ?").bind(id, businessId));
+    for (const item of prepared) {
+      statements.push(db.prepare("INSERT INTO order_items (id, business_id, order_id, product_id, product_name, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), businessId, id, item.productId, item.name, item.quantity, item.price, item.subtotal));
+      if (item.limited) statements.push(db.prepare("UPDATE products SET stock_quantity = stock_quantity - ?, stock_status = CASE WHEN stock_quantity - ? <= 0 THEN 'soldout' ELSE 'limited' END, updated_at = ? WHERE id = ? AND business_id = ? AND stock_quantity >= ?").bind(item.quantity, item.quantity, now, item.productId, businessId, item.quantity));
+    }
+  }
+
+  statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ? + ?, status = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" ? "transfer" : body.paymentMethod === "cash" ? "cash" : current.payment_method, body.scheduledTime === undefined ? current.scheduled_time : String(body.scheduledTime || "Ahora"), subtotal, shippingCost, subtotal, shippingCost, status, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
+  await db.batch(statements);
+  return { id, status, subtotal, total: subtotal + shippingCost };
 }
 
 export async function deleteKitchenOrder(businessId: string, id: string) {

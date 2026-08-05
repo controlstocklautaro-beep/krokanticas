@@ -40,3 +40,72 @@
   .k-order-person p,.k-order-note { font-size:11px; }.k-order-items > div { font-size:12px; }.k-order-actions button { min-height:44px; font-size:11px; }
   .k-module .chat-list > button { min-height:78px; }.k-module .chat-list strong { font-size:13px; }.k-module .chat-list small { font-size:11px; }.k-module .bubble { font-size:13px; }
 }
+
+/* Krokanticas operational extensions. */
+.k-wa.pending { border-color:#5c482d; color:#e7c88d; background:#342a20; }
+.k-wa.pending i { background:#d89b3e; box-shadow:0 0 0 3px #d89b3e25; }
+.k-wa.pending span { color:#b9955d; }
+.k-kpis article.attention { border-color:#e5b3a6; background:#fff4ef; }
+.k-kpis .red { color:#a64d36; background:#f3d4ca; }
+.k-integrations { margin-top:14px; }
+.k-integrations .k-card-head > small { max-width:260px; color:var(--k-muted); font-size:10px; text-align:right; }
+.k-integration-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.k-integration-list > div { min-height:76px; display:flex; flex-direction:column; justify-content:center; gap:7px; padding:14px 18px; border-right:1px solid var(--k-line); }
+.k-integration-list > div:last-child { border-right:0; }
+.k-integration-list span { color:var(--k-brown); font-size:12px; font-weight:750; }
+.k-integration-list b { width:max-content; max-width:100%; padding:5px 8px; border-radius:12px; color:#8b641f; background:#faebca; font-size:9px; font-weight:750; }
+.k-kitchen-tools { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
+.k-kitchen-tools .k-tabs { margin-bottom:0; }
+.k-kitchen-tools .k-search { width:min(340px,100%); flex:0 1 340px; }
+.k-form-note { margin:-4px 0 14px; color:var(--k-muted); font-size:10px; line-height:1.45; }
+.k-product-picker > div.soldout { opacity:.68; }
+.k-product-picker button:disabled { opacity:.42; cursor:not-allowed; }
+
+.k-handoff-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+.k-handoff-card { overflow:hidden; border:1px solid var(--k-line); border-radius:13px; background:#fff; box-shadow:0 5px 20px #4a32170b; }
+.k-handoff-card.high { border-color:#d99b87; }
+.k-handoff-card.resolved { opacity:.76; }
+.k-handoff-head { min-height:54px; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 16px; border-bottom:1px solid var(--k-line); background:#fcfaf6; }
+.k-handoff-head > div { display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+.k-handoff-head .k-priority { padding:5px 7px; border-radius:9px; color:#8c5c20; background:#f7e4bf; font-size:9px; letter-spacing:.04em; }
+.k-handoff-card.high .k-priority { color:#9d432e; background:#f4d7cf; }
+.k-handoff-card.low .k-priority { color:var(--k-green); background:#e2f1ea; }
+.k-handoff-head span { color:var(--k-muted); font-size:10px; font-weight:650; }
+.k-handoff-head time { flex:0 0 auto; color:var(--k-muted); font-size:9px; }
+.k-handoff-person { display:flex; align-items:center; gap:10px; padding:15px 16px 8px; }
+.k-handoff-person > span { width:38px; height:38px; display:grid; flex:0 0 auto; place-items:center; border-radius:50%; color:#784524; background:#f1d7c3; font-size:10px; font-weight:800; }
+.k-handoff-person h2 { margin:0 0 4px; font-family:Georgia,serif; font-size:17px; }
+.k-handoff-person p { margin:0; color:var(--k-muted); font-size:10px; }
+.k-handoff-summary { min-height:62px; margin:0; padding:8px 16px 14px; color:#51453e; font-size:12px; line-height:1.5; }
+.k-handoff-owner { min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 16px; background:var(--k-cream); }
+.k-handoff-owner > span { color:var(--k-muted); font-size:10px; font-weight:650; }
+.k-handoff-owner select { height:32px; padding:0 8px; border:1px solid var(--k-line); border-radius:7px; color:var(--k-brown); background:#fff; font-size:10px; }
+.k-handoff-actions { display:flex; gap:6px; padding:11px 12px; border-top:1px solid var(--k-line); }
+.k-handoff-actions button { min-height:36px; padding:0 11px; border:1px solid var(--k-line); border-radius:7px; color:#9c4b37; background:#fff; font-size:10px; }
+.k-handoff-actions .main { flex:1; color:#fff; border-color:var(--k-orange); background:var(--k-orange); font-weight:750; }
+
+@media (max-width:1050px) {
+  .k-integration-list { grid-template-columns:1fr; }
+  .k-integration-list > div { border-right:0; border-bottom:1px solid var(--k-line); }
+  .k-integration-list > div:last-child { border-bottom:0; }
+}
+
+@media (max-width:780px) {
+  .k-kitchen-tools { align-items:stretch; flex-direction:column; }
+  .k-kitchen-tools .k-search { width:100%; flex-basis:auto; }
+  .k-handoff-grid { grid-template-columns:1fr; }
+  .k-handoff-head { align-items:flex-start; }
+  .k-handoff-actions button { min-height:44px; font-size:11px; }
+  .k-integrations .k-card-head { align-items:flex-start; flex-direction:column; gap:7px; }
+  .k-integrations .k-card-head > small { text-align:left; }
+  .k-integration-list span { font-size:13px; }
+  .k-integration-list b { font-size:10px; }
+}
+
+@media (max-width:430px) {
+  .k-handoff-head { flex-direction:column; }
+  .k-handoff-owner { align-items:flex-start; flex-direction:column; }
+  .k-handoff-owner select { width:100%; }
+  .k-handoff-actions { flex-wrap:wrap; }
+  .k-handoff-actions .main { flex-basis:100%; }
+}

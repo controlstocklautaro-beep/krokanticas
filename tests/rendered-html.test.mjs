@@ -34,6 +34,9 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(panel, /CustomersModule businessId=\{BUSINESS_ID\}/);
   assert.match(panel, /function StockModule/);
   assert.match(panel, /function KitchenModule/);
+  assert.match(panel, /function HandoffsModule/);
+  assert.match(panel, /WhatsApp pendiente/);
+  assert.match(panel, /Object\.entries\(editItems\)/);
   assert.match(operationalModules, /export function MessagesModule/);
   assert.match(operationalModules, /address: form\.get\("address"\)/);
   assert.match(auth, /signin-with-chatgpt/);
@@ -72,6 +75,15 @@ test("includes persistent operational APIs and migrations", async () => {
     const source = await readFile(new URL(`app/api/kitchen/${endpoint}/route.ts`, root), "utf8");
     assert.match(source, /requireBusinessAccess/);
   }
+  const handoffs = await readFile(new URL("app/api/handoffs/route.ts", root), "utf8");
+  assert.match(handoffs, /requireBusinessAccess/);
+  assert.match(handoffs, /export async function GET/);
+  assert.match(handoffs, /export async function POST/);
+  assert.match(handoffs, /export async function PATCH/);
+  assert.match(handoffs, /export async function DELETE/);
+  const kitchenStore = await readFile(new URL("lib/server/kitchen-store.ts", root), "utf8");
+  assert.match(kitchenStore, /DELETE FROM order_items/);
+  assert.match(kitchenStore, /subtotal = prepared\.reduce/);
   const stock = await readFile(new URL("app/api/stock/route.ts", root), "utf8");
   const adjust = await readFile(new URL("app/api/stock/adjust/route.ts", root), "utf8");
   assert.match(stock, /stock_status/);
@@ -80,4 +92,9 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.match(krokanticasMigration, /CREATE TABLE `products`/);
   assert.match(krokanticasMigration, /CREATE TABLE `orders`/);
   assert.match(krokanticasMigration, /ALTER TABLE `contacts` ADD `address`/);
+  const migrations = await readdir(new URL("drizzle/", root));
+  const handoffMigrationName = migrations.find((name) => name.startsWith("0003_") && name.endsWith(".sql"));
+  assert.ok(handoffMigrationName, "Missing handoffs migration");
+  const handoffMigration = await readFile(new URL(`drizzle/${handoffMigrationName}`, root), "utf8");
+  assert.match(handoffMigration, /CREATE TABLE `handoffs`/);
 });

@@ -196,3 +196,24 @@ export const orderItems = sqliteTable("order_items", {
 }, (table) => [
   index("order_items_business_order_idx").on(table.businessId, table.orderId),
 ]);
+
+export const handoffs = sqliteTable("handoffs", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  contactId: text("contact_id"),
+  orderId: text("order_id"),
+  phoneNumber: text("phone_number"),
+  customerName: text("customer_name").notNull(),
+  reason: text("reason").notNull(),
+  summary: text("summary").notNull(),
+  priority: text("priority").notNull().default("medium"),
+  status: text("status").notNull().default("open"),
+  assignedTo: text("assigned_to"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  resolvedAt: integer("resolved_at"),
+}, (table) => [
+  index("handoffs_business_status_idx").on(table.businessId, table.status),
+  index("handoffs_business_created_idx").on(table.businessId, table.createdAt),
+  index("handoffs_business_contact_idx").on(table.businessId, table.contactId),
+]);
