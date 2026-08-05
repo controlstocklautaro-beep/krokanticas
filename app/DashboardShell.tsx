@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type ModuleId =
   | "dashboard"
@@ -31,6 +31,17 @@ type Reservation = {
   table: string;
   status: "Confirmada" | "Pendiente" | "En salón";
   initials: string;
+};
+
+type PipelineColumnRecord = { id: string; name: string; color: string; position: number };
+type PipelineLeadRecord = {
+  id: string;
+  columnId: string;
+  clientName: string;
+  subject: string;
+  amount: number;
+  currency: "ARS" | "USD";
+  priority: "alta" | "media" | "baja";
 };
 
 const moduleRegistry: Record<
@@ -321,7 +332,7 @@ export function DashboardShell() {
           {activeModule === "menu" && (
             <Menu availableItems={availableItems} setAvailableItems={setAvailableItems} />
           )}
-          {activeModule === "pipeline" && <Pipeline />}
+          {activeModule === "pipeline" && <Pipeline businessId={business.id} />}
           {activeModule === "finances" && <Finances />}
           {activeModule === "metrics" && <Metrics business={business} />}
         </section>
@@ -382,7 +393,7 @@ function Dashboard({ business, reservations, onNew }: { business: Business; rese
           <Kpi label="Clientes activos" value="127" meta="+9 este mes" tone="green" />
           <Kpi label="Facturación mensual" value="$ 3,4 M" meta="+12,5% vs. julio" tone="violet" />
         </div>
-        <div className="two-columns"><Pipeline compact /><Activity /></div>
+        <div className="two-columns"><Pipeline businessId={business.id} compact /><Activity /></div>
       </>
     );
   }
@@ -503,9 +514,147 @@ function Menu({ availableItems, setAvailableItems }: { availableItems: Record<nu
   );
 }
 
-function Pipeline({ compact = false }: { compact?: boolean }) {
-  const columns = [["Nuevos", "4", "Estudio Álamo", "Grupo Sur"], ["Contactados", "7", "Marea Labs", "Bruno Díaz"], ["Propuesta", "3", "Cauce SAS", "Vértice"], ["Cerrados", "5", "Norte Digital", "Lumen"]];
-  return <div className={compact ? "panel pipeline-compact" : ""}>{!compact && <PageHeading eyebrow="VENTAS" title="Pipeline" description="Seguimiento visual de oportunidades y próximos pasos." />}{compact && <div className="panel-head"><div><span className="eyebrow">OPORTUNIDADES</span><h2>Pipeline comercial</h2></div></div>}<div className="pipeline-board">{columns.map((column) => <div className="pipeline-column" key={column[0]}><div><strong>{column[0]}</strong><span>{column[1]}</span></div>{column.slice(2).map((card, index) => <button key={card}><span className="guest-avatar">{card.slice(0, 2).toUpperCase()}</span><strong>{card}</strong><small>{index ? "$ 420.000" : "$ 780.000"}</small></button>)}</div>)}</div></div>;
+function Pipeline({ businessId, compact = false }: { businessId: string; compact?: boolean }) {
+  const [columns, setColumns] = useState<PipelineColumnRecord[]>([]);
+  const [leads, setLeads] = useState<PipelineLeadRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [leadModal, setLeadModal] = useState<{ columnId: string } | null>(null);
+
+  async function reload() {
+    const [columnsResponse, leadsResponse] = await Promise.all([
+      fetch(`/api/pipeline/columns?businessId=${encodeURIComponent(businessId)}`),
+      fetch(`/api/pipeline/leads?businessId=${encodeURIComponent(businessId)}`),
+    ]);
+    if (!columnsResponse.ok || !leadsResponse.ok) throw new Error("No se pudo cargar el pipeline");
+    const columnsData = await columnsResponse.json() as { columns: PipelineColumnRecord[] };
+    const leadsData = await leadsResponse.json() as { leads: PipelineLeadRecord[] };
+    setColumns(columnsData.columns);
+    setLeads(leadsData.leads);
+  }
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch(`/api/pipeline/columns?businessId=${encodeURIComponent(businessId)}`).then((response) => {
+        if (!response.ok) throw new Error("No se pudo cargar el pipeline");
+        return response.json() as Promise<{ columns: PipelineColumnRecord[] }>;
+      }),
+      fetch(`/api/pipeline/leads?businessId=${encodeURIComponent(businessId)}`).then((response) => {
+        if (!response.ok) throw new Error("No se pudo cargar el pipeline");
+        return response.json() as Promise<{ leads: PipelineLeadRecord[] }>;
+      }),
+    ]).then(([columnsData, leadsData]) => {
+      if (!active) return;
+      setColumns(columnsData.columns);
+      setLeads(leadsData.leads);
+    }).catch((loadError) => {
+      if (active) setError(loadError instanceof Error ? loadError.message : "Error inesperado");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [businessId]);
+
+  async function addColumn() {
+    const name = window.prompt("Nombre de la nueva columna");
+    if (!name?.trim()) return;
+    const response = await fetch("/api/pipeline/columns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId, name }),
+    });
+    if (response.ok) await reload();
+  }
+
+  async function saveLead(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!leadModal) return;
+    const form = new FormData(event.currentTarget);
+    const response = await fetch("/api/pipeline/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        businessId,
+        columnId: leadModal.columnId,
+        clientName: form.get("clientName"),
+        subject: form.get("subject"),
+        amount: Number(form.get("amount")),
+        currency: form.get("currency"),
+        priority: form.get("priority"),
+      }),
+    });
+    if (response.ok) {
+      setLeadModal(null);
+      await reload();
+    }
+  }
+
+  async function moveLead(columnId: string) {
+    if (!draggingId) return;
+    setLeads((current) => current.map((lead) => lead.id === draggingId ? { ...lead, columnId } : lead));
+    await fetch("/api/pipeline/leads", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId, id: draggingId, columnId }),
+    });
+    setDraggingId(null);
+  }
+
+  async function deleteLead(id: string) {
+    if (!window.confirm("¿Eliminar esta oportunidad?")) return;
+    const response = await fetch("/api/pipeline/leads", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId, id }),
+    });
+    if (response.ok) setLeads((current) => current.filter((lead) => lead.id !== id));
+  }
+
+  return (
+    <div className={compact ? "panel pipeline-compact" : ""}>
+      {!compact && <PageHeading eyebrow="VENTAS" title="Pipeline" description="Seguimiento real de oportunidades, aislado por empresa." action={<button className="primary" onClick={addColumn}>＋ Nueva columna</button>} />}
+      {compact && <div className="panel-head"><div><span className="eyebrow">OPORTUNIDADES</span><h2>Pipeline comercial</h2></div><button className="text-button" onClick={addColumn}>＋ Columna</button></div>}
+      {loading && <div className="pipeline-message">Cargando pipeline...</div>}
+      {error && <div className="pipeline-message pipeline-error">{error}</div>}
+      {!loading && !error && (
+        <div className="pipeline-board">
+          {columns.map((column) => {
+            const columnLeads = leads.filter((lead) => lead.columnId === column.id);
+            return (
+              <div className="pipeline-column" key={column.id} onDragOver={(event) => event.preventDefault()} onDrop={() => moveLead(column.id)}>
+                <div className="pipeline-column-head"><span className="pipeline-color" style={{ background: column.color }} /><strong>{column.name}</strong><span>{columnLeads.length}</span><button onClick={() => setLeadModal({ columnId: column.id })}>＋</button></div>
+                {columnLeads.map((lead) => (
+                  <article className="pipeline-card" key={lead.id} draggable onDragStart={() => setDraggingId(lead.id)}>
+                    <span className="guest-avatar">{lead.clientName.slice(0, 2).toUpperCase()}</span>
+                    <strong>{lead.clientName}</strong>
+                    <small>{lead.subject || "Sin detalle"}</small>
+                    <b>{lead.currency === "USD" ? "US$" : "$"} {lead.amount.toLocaleString("es-AR")}</b>
+                    <i className={`priority priority-${lead.priority}`}>{lead.priority}</i>
+                    <button onClick={() => deleteLead(lead.id)} aria-label={`Eliminar ${lead.clientName}`}>×</button>
+                  </article>
+                ))}
+                <button className="add-lead" onClick={() => setLeadModal({ columnId: column.id })}>＋ Agregar oportunidad</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {leadModal && (
+        <div className="modal-backdrop" onMouseDown={() => setLeadModal(null)}>
+          <form className="modal" onSubmit={saveLead} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head"><div><span className="eyebrow">PIPELINE</span><h2>Nueva oportunidad</h2></div><button type="button" onClick={() => setLeadModal(null)}>×</button></div>
+            <label>Cliente<input name="clientName" placeholder="Nombre o empresa" required autoFocus /></label>
+            <label>Asunto<input name="subject" placeholder="Servicio o necesidad" /></label>
+            <div className="form-grid"><label>Monto<input name="amount" type="number" min="0" defaultValue="0" /></label><label>Moneda<select name="currency"><option>ARS</option><option>USD</option></select></label></div>
+            <label>Prioridad<select name="priority" defaultValue="media"><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option></select></label>
+            <div className="modal-actions"><button type="button" className="secondary" onClick={() => setLeadModal(null)}>Cancelar</button><button className="primary" type="submit">Crear oportunidad</button></div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Finances() {
