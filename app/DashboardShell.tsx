@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { CustomersModule, FinancesModule, MessagesModule, MetricsModule, TagsModule } from "./components/OperationalModules";
 
 type ModuleId =
   | "dashboard"
@@ -10,6 +11,7 @@ type ModuleId =
   | "tables"
   | "menu"
   | "pipeline"
+  | "tags"
   | "finances"
   | "metrics";
 
@@ -55,6 +57,7 @@ const moduleRegistry: Record<
   tables: { label: "Mesas", icon: "◇", group: "management" },
   menu: { label: "Menú", icon: "≡", group: "management" },
   pipeline: { label: "Pipeline", icon: "→", group: "management" },
+  tags: { label: "Etiquetas", icon: "#", group: "management" },
   finances: { label: "Finanzas", icon: "$", group: "management" },
   metrics: { label: "Métricas", icon: "↗", group: "management" },
 };
@@ -74,6 +77,7 @@ const businesses: Business[] = [
       "reservations",
       "tables",
       "menu",
+      "tags",
       "finances",
       "metrics",
     ],
@@ -90,6 +94,7 @@ const businesses: Business[] = [
       "messages",
       "customers",
       "pipeline",
+      "tags",
       "finances",
       "metrics",
     ],
@@ -133,21 +138,6 @@ const initialReservations: Reservation[] = [
     status: "En salón",
     initials: "DR",
   },
-];
-
-const customerRows = [
-  ["Lucía Fernández", "+54 9 11 4520 9814", "12 visitas", "VIP", "Hace 2 días"],
-  ["Martín Acosta", "+54 9 11 3098 1277", "4 visitas", "Sin gluten", "Hoy"],
-  ["Sofía Quiroga", "+54 9 11 6821 4402", "8 visitas", "Cumpleaños", "Ayer"],
-  ["Diego Ramos", "+54 9 11 5409 8821", "3 visitas", "Terraza", "Hoy"],
-  ["Camila Torres", "+54 9 11 7720 1138", "6 visitas", "Vegetariana", "Hace 5 días"],
-];
-
-const chatRows = [
-  ["Martín Acosta", "¿Tienen opciones sin gluten?", "2 min", "2"],
-  ["Lucía Fernández", "Perfecto, confirmamos para cuatro", "12 min", ""],
-  ["Camila Torres", "Quería reservar para el sábado", "28 min", "1"],
-  ["Julián Pérez", "Gracias por la atención", "1 h", ""],
 ];
 
 const menuItems = [
@@ -321,8 +311,8 @@ export function DashboardShell() {
           {activeModule === "dashboard" && (
             <Dashboard business={business} reservations={reservations} onNew={() => setReservationModal(true)} />
           )}
-          {activeModule === "messages" && <Messages />}
-          {activeModule === "customers" && <Customers />}
+          {activeModule === "messages" && <MessagesModule businessId={business.id} />}
+          {activeModule === "customers" && <CustomersModule businessId={business.id} />}
           {activeModule === "reservations" && (
             <Reservations reservations={reservations} onNew={() => setReservationModal(true)} />
           )}
@@ -333,8 +323,9 @@ export function DashboardShell() {
             <Menu availableItems={availableItems} setAvailableItems={setAvailableItems} />
           )}
           {activeModule === "pipeline" && <Pipeline businessId={business.id} />}
-          {activeModule === "finances" && <Finances />}
-          {activeModule === "metrics" && <Metrics business={business} />}
+          {activeModule === "tags" && <TagsModule businessId={business.id} />}
+          {activeModule === "finances" && <FinancesModule businessId={business.id} />}
+          {activeModule === "metrics" && <MetricsModule businessId={business.id} businessType={business.type} />}
         </section>
       </main>
 
@@ -458,29 +449,6 @@ function Activity() {
         <div><span className="activity-icon gold">$</span><p><strong>Pago registrado</strong><small>Cierre parcial de caja · hace 38 min</small></p></div>
       </div>
     </div>
-  );
-}
-
-function Messages() {
-  const [selected, setSelected] = useState(0);
-  return (
-    <>
-      <PageHeading eyebrow="WHATSAPP" title="Mensajes" description="Todas las conversaciones del negocio en un solo lugar." />
-      <div className="messages-layout panel">
-        <div className="chat-list"><div className="chat-search"><span>⌕</span><input placeholder="Buscar conversación" aria-label="Buscar conversación" /></div>{chatRows.map((chat, index) => <button key={chat[0]} className={selected === index ? "selected" : ""} onClick={() => setSelected(index)}><span className="guest-avatar">{chat[0].split(" ").map((word) => word[0]).join("").slice(0, 2)}</span><span><strong>{chat[0]}</strong><small>{chat[1]}</small></span><time>{chat[2]}</time>{chat[3] && <b>{chat[3]}</b>}</button>)}</div>
-        <div className="chat-window"><div className="chat-person"><span className="guest-avatar">{chatRows[selected][0].split(" ").map((word) => word[0]).join("").slice(0, 2)}</span><span><strong>{chatRows[selected][0]}</strong><small>En línea · WhatsApp</small></span><button>⋮</button></div><div className="chat-body"><div className="bubble incoming">Hola, quería consultar si tienen disponibilidad para este sábado.</div><div className="bubble outgoing">¡Hola! Sí, tenemos lugares disponibles. ¿Para cuántas personas?</div><div className="bubble incoming">Seríamos 4. ¿Tienen opciones sin gluten?</div></div><div className="chat-compose"><button>＋</button><input placeholder="Escribí un mensaje..." aria-label="Escribir mensaje" /><button className="send">➤</button></div></div>
-      </div>
-    </>
-  );
-}
-
-function Customers() {
-  return (
-    <>
-      <PageHeading eyebrow="BASE DE CLIENTES" title="Clientes" description="Preferencias, historial y contexto para una atención más personal." action={<button className="primary">＋ Nuevo cliente</button>} />
-      <div className="panel table-panel"><div className="table-tools"><label className="search"><span>⌕</span><input placeholder="Buscar por nombre o teléfono" /></label><button className="filter-button">≡ Filtros</button></div><div className="data-table"><div className="data-row data-head"><span>CLIENTE</span><span>TELÉFONO</span><span>HISTORIAL</span><span>PREFERENCIA</span><span>ÚLTIMA ACTIVIDAD</span></div>{customerRows.map((row) => <div className="data-row" key={row[0]}><span className="customer-cell"><i className="guest-avatar">{row[0].split(" ").map((word) => word[0]).join("").slice(0, 2)}</i><strong>{row[0]}</strong></span><span>{row[1]}</span><span>{row[2]}</span><span><b className="tag">{row[3]}</b></span><span>{row[4]}</span></div>)}</div>
-      </div>
-    </>
   );
 }
 
@@ -654,26 +622,5 @@ function Pipeline({ businessId, compact = false }: { businessId: string; compact
         </div>
       )}
     </div>
-  );
-}
-
-function Finances() {
-  return (
-    <>
-      <PageHeading eyebrow="ADMINISTRACIÓN" title="Finanzas" description="Ingresos, egresos y movimientos del negocio en un solo tablero." action={<button className="primary">＋ Registrar movimiento</button>} />
-      <div className="kpi-grid"><Kpi label="Ingresos del mes" value="$ 8,4 M" meta="+14,2% vs. julio" tone="green" /><Kpi label="Egresos del mes" value="$ 3,1 M" meta="36,9% de ingresos" tone="orange" /><Kpi label="Balance" value="$ 5,3 M" meta="Resultado positivo" tone="blue" /><Kpi label="Ticket promedio" value="$ 32.400" meta="+6,4% este mes" tone="violet" /></div>
-      <div className="two-columns"><div className="panel finance-chart"><div className="panel-head"><div><span className="eyebrow">FLUJO</span><h2>Ingresos y egresos</h2></div><select><option>Últimos 6 meses</option></select></div><div className="line-chart"><span className="chart-line line-one" /><span className="chart-line line-two" />{[44, 58, 52, 72, 68, 89].map((value, index) => <i key={index} style={{ left: `${index * 19 + 2}%`, bottom: `${value}%` }} />)}</div><div className="chart-months"><span>Mar</span><span>Abr</span><span>May</span><span>Jun</span><span>Jul</span><span>Ago</span></div></div><div className="panel movement-list"><div className="panel-head"><div><span className="eyebrow">RECIENTES</span><h2>Últimos movimientos</h2></div></div>{[["Cierre de caja", "+ $ 486.200", "Ingreso"], ["Proveedor de bebidas", "− $ 128.400", "Egreso"], ["Reserva evento", "+ $ 220.000", "Ingreso"], ["Insumos cocina", "− $ 94.800", "Egreso"]].map((row) => <div key={row[0]}><span className={row[2] === "Ingreso" ? "activity-icon" : "activity-icon gold"}>{row[2] === "Ingreso" ? "↑" : "↓"}</span><p><strong>{row[0]}</strong><small>Hoy · Transferencia</small></p><b>{row[1]}</b></div>)}</div></div>
-    </>
-  );
-}
-
-function Metrics({ business }: { business: Business }) {
-  const restaurant = business.type === "Restaurante";
-  return (
-    <>
-      <PageHeading eyebrow="ANÁLISIS" title="Métricas" description={restaurant ? "Tendencias de reservas, ocupación y experiencia del cliente." : "Rendimiento comercial y evolución de la cartera."} action={<button className="filter-button">Últimos 30 días ⌄</button>} />
-      <div className="kpi-grid"><Kpi label={restaurant ? "Reservas" : "Nuevos contactos"} value={restaurant ? "426" : "84"} meta="+18,4% vs. período anterior" tone="orange" /><Kpi label={restaurant ? "Ocupación promedio" : "Conversión"} value={restaurant ? "71%" : "23,8%"} meta="+4,2 puntos" tone="green" /><Kpi label={restaurant ? "No-show" : "Tiempo de respuesta"} value={restaurant ? "3,8%" : "8 min"} meta="Mejoró 1,4 puntos" tone="blue" /><Kpi label="Satisfacción" value="4,8" meta="Sobre 5 · 96 reseñas" tone="violet" /></div>
-      <div className="two-columns"><div className="panel metrics-panel"><div className="panel-head"><div><span className="eyebrow">EVOLUCIÓN</span><h2>{restaurant ? "Reservas por día" : "Contactos por día"}</h2></div></div><div className="metric-bars">{[55, 68, 48, 83, 92, 76, 64, 88, 71, 96, 82, 91].map((height, index) => <div key={index}><span style={{ height: `${height}%` }} /><small>{index % 2 === 0 ? index + 1 : ""}</small></div>)}</div></div><div className="panel source-panel"><div className="panel-head"><div><span className="eyebrow">ORIGEN</span><h2>Canales principales</h2></div></div>{[["WhatsApp", 62], ["Instagram", 21], ["Web", 11], ["Teléfono", 6]].map((source) => <div className="source-row" key={source[0]}><span>{source[0]}</span><div><i style={{ width: `${source[1]}%` }} /></div><b>{source[1]}%</b></div>)}</div></div>
-    </>
   );
 }

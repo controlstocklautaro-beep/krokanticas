@@ -77,6 +77,33 @@ export const chatTags = sqliteTable("chat_tags", {
   index("chat_tags_business_phone_idx").on(table.businessId, table.phoneNumber),
 ]);
 
+export const tags = sqliteTable("tags", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [uniqueIndex("tags_business_name_uq").on(table.businessId, table.name)]);
+
+export const transactions = sqliteTable("transactions", {
+  id: text("id").primaryKey(),
+  businessId: text("business_id").notNull(),
+  type: text("type").notNull(),
+  concept: text("concept").notNull(),
+  amount: real("amount").notNull(),
+  currency: text("currency").notNull(),
+  category: text("category").notNull(),
+  transactionDate: integer("transaction_date").notNull(),
+  status: text("status").notNull(),
+  notes: text("notes"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [
+  index("transactions_business_date_idx").on(table.businessId, table.transactionDate),
+  index("transactions_business_type_idx").on(table.businessId, table.type),
+]);
+
 export const pipelineColumns = sqliteTable("pipeline_columns", {
   id: text("id").primaryKey(),
   businessId: text("business_id").notNull(),
