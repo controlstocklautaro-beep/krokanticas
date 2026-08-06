@@ -1,0 +1,3 @@
+export function AuthShell({ children }: { children: React.ReactNode }) {
+  return <main className="auth-page"><section className="auth-brand-panel"><div className="auth-brand"><span>K</span><div><strong>KROKANTICAS</strong><small>Central de pedidos</small></div></div><div className="auth-brand-copy"><span>PANEL OPERATIVO</span><h2>Todo el negocio,<br />en un solo lugar.</h2><p>Conversaciones, contactos, stock y cocina con acceso privado para tu equipo.</p></div><div className="auth-security"><i>✓</i><div><strong>Acceso protegido</strong><small>Sesiones privadas y permisos por usuario</small></div></div></section><section className="auth-form-panel">{children}<p className="auth-footer">Krokanticas · Panel operable desde celular</p></section></main>;
+}

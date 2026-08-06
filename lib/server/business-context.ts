@@ -1,8 +1,9 @@
 import { getD1 } from "@/db";
 import { ensureSchema } from "@/db/ensure-schema";
+import { AppRole, getAppUserFromRequest } from "./app-auth";
 import { ApiError, normalizeBusinessId } from "./api-utils";
 
-export type BusinessRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
+export type BusinessRole = AppRole;
 export type BusinessContext = { businessId: string; userId: string | null; role: BusinessRole | "integration" };
 type AccessOptions = { allowIntegration?: boolean; roles?: BusinessRole[] };
 
@@ -34,9 +35,18 @@ export async function requireBusinessAccess(
   await ensureSchema();
   const db = getD1();
   const now = Date.now();
-  const userId = req.headers.get("oai-authenticated-user-id") ??
-    (process.env.NODE_ENV !== "production" ? req.headers.get("x-dev-user-id") ?? "local-demo-user" : null);
-  const email = req.headers.get("oai-authenticated-user-email");
+  const appUser = await getAppUserFromRequest(req, businessId);
+  if (appUser) {
+    if (appUser.mustChangePassword) throw new ApiError("Debés actualizar tu contraseña antes de continuar", 403);
+    if (options.roles && !options.roles.includes(appUser.role)) {
+      throw new ApiError("Tu rol no permite realizar esta acción", 403);
+    }
+    return { businessId, userId: appUser.id, role: appUser.role };
+  }
+  const allowPlatformFallback = process.env.ALLOW_PLATFORM_AUTH_FALLBACK === "true";
+  const userId = allowPlatformFallback ? req.headers.get("oai-authenticated-user-id") :
+    (process.env.NODE_ENV !== "production" && process.env.ALLOW_DEV_AUTH_BYPASS === "true" ? req.headers.get("x-dev-user-id") : null);
+  const email = allowPlatformFallback ? req.headers.get("oai-authenticated-user-email") : null;
 
   let business = await db.prepare("SELECT id, integration_key_hash FROM businesses WHERE id = ?")
     .bind(businessId).first<{ id: string; integration_key_hash: string | null }>();

@@ -6,7 +6,7 @@ Versión preparada para entregar al responsable del negocio y al programador de 
 
 El panel resuelve la parte visual y persistente de Krokanticas:
 
-- acceso privado con login;
+- acceso privado con correo, contraseña y recuperación;
 - contactos y direcciones;
 - conversaciones, mensajes, etiquetas y control del bot;
 - catálogo, sinónimos y stock por variedad;
@@ -33,7 +33,7 @@ Continúan fuera del alcance contratado: impresión automática, finanzas, mater
 
 Ya queda listo en el código del panel:
 
-- login, permisos por empresa y sesión persistente;
+- login propio, permisos por empresa, roles, usuarios y sesión persistente;
 - interfaz responsive y PWA instalable;
 - almacenamiento y API de contactos, direcciones, conversaciones, mensajes, etiquetas, bot, stock, comandas, derivaciones y configuración;
 - descuento y devolución automática de stock al crear, editar o eliminar comandas;
@@ -48,6 +48,7 @@ Queda para la etapa de integración externa:
 - descargar los archivos entrantes desde Meta, transcribir audios y ejecutar el agente de IA;
 - implementar en n8n la memoria temporal, deduplicación, resolución de ambigüedades, zonas y confirmación explícita;
 - enviar a WhatsApp los textos que el panel entrega a `N8N_WEBHOOK_URL`;
+- conectar `PASSWORD_RESET_WEBHOOK_URL` para enviar por correo o mensajería el enlace de recuperación generado por el panel;
 - definir con el programador el envío de adjuntos salientes desde el panel. Las rutas `/api/upload-image` y `/api/upload-media` almacenan el archivo y el mensaje, pero actualmente no disparan por sí solas un envío a Meta;
 - publicar la versión final, cargar usuarios autorizados y ejecutar el piloto.
 
@@ -112,6 +113,8 @@ También se admite `x-business-id: krokanticas`, pero es preferible enviar `busi
 BUSINESS_INTEGRATION_KEY=<clave larga y aleatoria compartida con n8n>
 N8N_WEBHOOK_URL=<webhook de producción que envía mensajes por WhatsApp>
 MEDIA_CLEANUP_SECRET=<clave distinta para la limpieza programada de multimedia>
+PASSWORD_RESET_WEBHOOK_URL=<webhook opcional que entrega enlaces de recuperación>
+PASSWORD_RESET_WEBHOOK_SECRET=<secreto opcional para autenticar ese webhook>
 ```
 
 No se deben reutilizar tokens de Meta como clave del panel.
@@ -250,6 +253,22 @@ Acciones recomendadas:
 
 Cuando el equipo resuelva el caso puede reactivar el bot desde el panel o mediante `/api/toggle-bot`.
 
+### 4.8 Recuperación de acceso al panel
+
+El usuario solicita el enlace desde `/forgot-password`. El panel crea un token de un solo uso válido durante 30 minutos y, si `PASSWORD_RESET_WEBHOOK_URL` está configurada, llama ese webhook con:
+
+```json
+{
+  "businessId": "krokanticas",
+  "email": "usuario@krokanticas.com",
+  "name": "Nombre del usuario",
+  "resetUrl": "https://panel/reset-password?token=...",
+  "expiresInMinutes": 30
+}
+```
+
+Si existe `PASSWORD_RESET_WEBHOOK_SECRET`, el panel agrega `Authorization: Bearer <PASSWORD_RESET_WEBHOOK_SECRET>`. n8n debe entregar el enlace al correo o canal aprobado sin modificarlo ni registrarlo en logs visibles. El token queda inutilizado después del primer uso.
+
 ## 5. Inventario de endpoints
 
 | Método | Endpoint | Acceso n8n | Uso |
@@ -288,6 +307,14 @@ Cuando el equipo resuelva el caso puede reactivar el bot desde el panel o median
 | POST | `/api/delete-all-chats` | No | Borrar todas las conversaciones |
 | GET | `/api/cleanup-expired-media` | Secreto propio | Limpieza programada de archivos |
 | GET | `/api/media/{ruta}` | URL generada | Leer multimedia almacenada |
+| GET | `/api/auth/status` | No | Estado de sesión y alta inicial del panel |
+| POST | `/api/auth/setup` | No | Crear el primer propietario |
+| POST | `/api/auth/login` | No | Iniciar sesión con correo y contraseña |
+| GET / POST | `/api/auth/logout` | No | Cerrar sesión |
+| POST | `/api/auth/forgot-password` | No; llama webhook | Crear enlace de recuperación |
+| POST | `/api/auth/reset-password` | No | Consumir el enlace y cambiar contraseña |
+| POST | `/api/auth/change-password` | No | Reemplazar contraseña temporal |
+| GET / POST / PATCH | `/api/users` | No | Administrar usuarios y roles |
 
 Los endpoints `/api/finances`, `/api/metrics` y `/api/pipeline/*` pertenecen a la base multiempresa. No deben conectarse para Krokanticas en esta etapa.
 
@@ -920,6 +947,108 @@ GET /api/cleanup-expired-media?businessId=krokanticas
 
 Los archivos de imagen y audio se conservan 90 días. La ruta procesa hasta 2.000 elementos por ejecución y deja el mensaje histórico marcado como archivo vencido.
 
+### 6.26 `GET /api/auth/status`
+
+Acceso: navegador del panel. Responde sin caché:
+
+```json
+{
+  "authenticated": false,
+  "user": null,
+  "needsSetup": true,
+  "setupAllowed": true
+}
+```
+
+`needsSetup` solo es verdadero mientras no existe ningún usuario. En producción el alta inicial requiere además el acceso privado de Sites.
+
+### 6.27 `POST /api/auth/setup`
+
+Acceso: únicamente durante el primer acceso.
+
+```json
+{
+  "name": "Responsable Krokanticas",
+  "email": "responsable@krokanticas.com",
+  "password": "Contraseña segura 2026"
+}
+```
+
+Crea al primer `owner`, inicia la sesión y deja de aceptar nuevas llamadas de setup. Respuestas especiales: `403` si el alta inicial no está autorizada y `409` si el propietario ya existe.
+
+### 6.28 `POST /api/auth/login`
+
+```json
+{
+  "email": "responsable@krokanticas.com",
+  "password": "Contraseña segura 2026"
+}
+```
+
+Al validar las credenciales entrega una cookie `HttpOnly`, `SameSite=Lax`, con 30 días de vigencia. Devuelve `401` con un mensaje genérico cuando las credenciales son incorrectas y `403` para usuarios desactivados.
+
+### 6.29 `GET /api/auth/logout` o `POST /api/auth/logout`
+
+Elimina la sesión actual, vence la cookie y redirige a `/login`. No requiere integración con n8n.
+
+### 6.30 `POST /api/auth/forgot-password`
+
+```json
+{ "email": "responsable@krokanticas.com" }
+```
+
+Siempre devuelve un mensaje neutro para no revelar si un correo existe. Si el usuario está activo, genera el token y llama `PASSWORD_RESET_WEBHOOK_URL` con el payload documentado en 4.8. Solo en desarrollo local devuelve también `developmentResetUrl`.
+
+### 6.31 `POST /api/auth/reset-password`
+
+```json
+{
+  "token": "token-recibido-en-el-enlace",
+  "password": "Nueva contraseña 2026"
+}
+```
+
+Consume el token una sola vez, cambia la contraseña y cierra todas las sesiones anteriores.
+
+### 6.32 `POST /api/auth/change-password`
+
+Acceso: sesión del panel.
+
+```json
+{ "password": "Contraseña personal 2026" }
+```
+
+Se usa después de entrar con una contraseña temporal creada por un administrador. Renueva la sesión y habilita el acceso al resto del panel.
+
+### 6.33 `GET`, `POST` y `PATCH /api/users`
+
+Acceso: propietarios y administradores. `GET` requiere `businessId=krokanticas`. Para crear:
+
+```json
+{
+  "businessId": "krokanticas",
+  "name": "Operador Cocina",
+  "email": "cocina@krokanticas.com",
+  "role": "staff",
+  "password": "Temporal 2026"
+}
+```
+
+Para modificar rol, estado, nombre o contraseña temporal:
+
+```json
+{
+  "businessId": "krokanticas",
+  "id": "uuid-usuario",
+  "name": "Operador Cocina",
+  "role": "reception",
+  "active": true,
+  "password": "Nueva temporal 2026"
+}
+```
+
+La API impide desactivar el usuario propio, impide que un administrador modifique propietarios y exige que siempre quede al menos un propietario activo.
+
 ## 7. Rutas exactas heredadas de Ramayo
 
 Estos nombres no deben modificarse en n8n:
@@ -1028,6 +1157,7 @@ No volver a llamar a `ingest-message` en este workflow: `/api/send-message` ya g
 - [ ] Cálculo de zona y envío implementado.
 - [ ] Flujo de reclamos y atención humana implementado.
 - [ ] Webhook de salida del panel implementado.
+- [ ] Webhook de recuperación de contraseña configurado y probado.
 - [ ] Limpieza de multimedia programada.
 - [ ] Pruebas de aceptación completadas.
 
@@ -1036,5 +1166,6 @@ No volver a llamar a `ingest-message` en este workflow: `/api/send-message` ya g
 - [ ] Configurar las tres variables de producción.
 - [ ] Publicar la versión final.
 - [ ] Autorizar usuarios del cliente.
+- [ ] Crear el propietario inicial y reemplazar todas las contraseñas temporales.
 - [ ] Probar instalación PWA en Android e iPhone.
 - [ ] Ejecutar un piloto controlado antes de anunciar el número.

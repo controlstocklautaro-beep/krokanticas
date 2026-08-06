@@ -2,7 +2,22 @@
 
 La entrega completa para implementar n8n, incluidos flujos, responsabilidades, ejemplos y pruebas de aceptación, está en `docs/KROKANTICAS_N8N_HANDOFF.md`.
 
-Todas las rutas usan JSON y requieren `businessId: "krokanticas"`. Las integraciones de n8n deben enviar `Authorization: Bearer <BUSINESS_INTEGRATION_KEY>` o `x-business-key`. El panel web usa la identidad autenticada de Sites.
+Todas las rutas usan JSON y requieren `businessId: "krokanticas"`. Las integraciones de n8n deben enviar `Authorization: Bearer <BUSINESS_INTEGRATION_KEY>` o `x-business-key`. El panel web utiliza su propia sesión segura mediante cookie `HttpOnly`; nunca se debe compartir esa cookie con n8n.
+
+## Acceso y usuarios del panel
+
+- `GET /api/auth/status`: informa si existe el administrador inicial y si hay una sesión activa.
+- `POST /api/auth/setup`: crea el primer propietario cuando la base todavía no tiene usuarios.
+- `POST /api/auth/login`: inicia sesión con correo y contraseña.
+- `GET /api/auth/logout`: cierra la sesión actual.
+- `POST /api/auth/forgot-password`: crea un enlace de recuperación de un solo uso.
+- `POST /api/auth/reset-password`: restablece una contraseña mediante token.
+- `POST /api/auth/change-password`: reemplaza una contraseña temporal después del primer ingreso.
+- `GET /api/users?businessId=krokanticas`: lista usuarios para propietarios y administradores.
+- `POST /api/users`: crea un usuario con rol y contraseña temporal.
+- `PATCH /api/users`: modifica nombre, rol, estado o contraseña temporal.
+
+Las contraseñas se almacenan con PBKDF2-SHA256 y sal aleatoria; las sesiones y tokens de recuperación se almacenan únicamente como hashes. Los roles disponibles son `owner`, `admin`, `manager`, `reception`, `cashier` y `staff`.
 
 ## Contactos
 

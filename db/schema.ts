@@ -22,6 +22,43 @@ export const memberships = sqliteTable("memberships", {
   index("memberships_user_idx").on(table.userId),
 ]);
 
+export const appUsers = sqliteTable("app_users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(false),
+  lastLoginAt: integer("last_login_at"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [uniqueIndex("app_users_email_uq").on(table.email)]);
+
+export const appSessions = sqliteTable("app_sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("app_sessions_token_uq").on(table.tokenHash),
+  index("app_sessions_user_idx").on(table.userId),
+  index("app_sessions_expiry_idx").on(table.expiresAt),
+]);
+
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  usedAt: integer("used_at"),
+  createdAt: integer("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("password_reset_tokens_hash_uq").on(table.tokenHash),
+  index("password_reset_tokens_user_idx").on(table.userId),
+  index("password_reset_tokens_expiry_idx").on(table.expiresAt),
+]);
+
 export const contacts = sqliteTable("contacts", {
   id: text("id").primaryKey(),
   businessId: text("business_id").notNull(),

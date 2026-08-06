@@ -18,7 +18,7 @@ const exactRamayoEndpoints = [
 ];
 
 test("defines the authenticated Krokanticas operations panel", async () => {
-  const [page, layout, panel, panelStyles, operationalModules, pwaInstall, manifest, serviceWorker, n8nGuide, auth, hosting] = await Promise.all([
+  const [page, layout, panel, panelStyles, operationalModules, pwaInstall, manifest, serviceWorker, n8nGuide, authForms, appAuth, usersModule, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("app/KrokanticasPanel.tsx", root), "utf8"),
@@ -28,11 +28,14 @@ test("defines the authenticated Krokanticas operations panel", async () => {
     readFile(new URL("public/manifest.webmanifest", root), "utf8"),
     readFile(new URL("public/sw.js", root), "utf8"),
     readFile(new URL("docs/KROKANTICAS_N8N_HANDOFF.md", root), "utf8"),
-    readFile(new URL("app/chatgpt-auth.ts", root), "utf8"),
+    readFile(new URL("app/components/AuthForms.tsx", root), "utf8"),
+    readFile(new URL("lib/server/app-auth.ts", root), "utf8"),
+    readFile(new URL("app/components/UsersModule.tsx", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
   ]);
 
-  assert.match(page, /requireChatGPTUser/);
+  assert.match(page, /getAppUserBySessionToken/);
+  assert.match(page, /redirect\("\/login"\)/);
   assert.match(page, /<KrokanticasPanel/);
   assert.match(layout, /Krokanticas \| Central de pedidos/);
   assert.match(panel, /MessagesModule businessId=\{BUSINESS_ID\}/);
@@ -43,6 +46,8 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(panel, /WhatsApp pendiente/);
   assert.match(panel, /Object\.entries\(editItems\)/);
   assert.match(panel, /<PwaInstall/);
+  assert.match(panel, /<UsersModule/);
+  assert.match(panel, /\/api\/auth\/logout/);
   assert.match(layout, /manifest: "\/manifest\.webmanifest"/);
   assert.match(layout, /appleWebApp/);
   assert.match(pwaInstall, /serviceWorker\.register\("\/sw\.js"/);
@@ -61,7 +66,13 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.ok(pwaManifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
   assert.match(operationalModules, /export function MessagesModule/);
   assert.match(operationalModules, /address: form\.get\("address"\)/);
-  assert.match(auth, /signin-with-chatgpt/);
+  assert.match(authForms, /\/api\/auth\/login/);
+  assert.match(authForms, /\/api\/auth\/forgot-password/);
+  assert.match(authForms, /\/api\/auth\/reset-password/);
+  assert.match(authForms, /\/api\/auth\/change-password/);
+  assert.match(appAuth, /PBKDF2/);
+  assert.match(appAuth, /HttpOnly; SameSite=Lax/);
+  assert.match(usersModule, /\/api\/users/);
 
   const hostingConfig = JSON.parse(hosting);
   assert.equal(hostingConfig.d1, "DB");
@@ -121,4 +132,10 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.ok(handoffMigrationName, "Missing handoffs migration");
   const handoffMigration = await readFile(new URL(`drizzle/${handoffMigrationName}`, root), "utf8");
   assert.match(handoffMigration, /CREATE TABLE `handoffs`/);
+  const authMigrationName = migrations.find((name) => name.startsWith("0004_") && name.endsWith(".sql"));
+  assert.ok(authMigrationName, "Missing application authentication migration");
+  const authMigration = await readFile(new URL(`drizzle/${authMigrationName}`, root), "utf8");
+  assert.match(authMigration, /CREATE TABLE `app_users`/);
+  assert.match(authMigration, /CREATE TABLE `app_sessions`/);
+  assert.match(authMigration, /CREATE TABLE `password_reset_tokens`/);
 });

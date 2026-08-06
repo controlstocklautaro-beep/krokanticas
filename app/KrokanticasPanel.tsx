@@ -3,10 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CustomersModule, MessagesModule } from "./components/OperationalModules";
 import { PwaInstall } from "./components/PwaInstall";
+import { UsersModule } from "./components/UsersModule";
 
 const BUSINESS_ID = "krokanticas";
 
-type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen";
+type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "users";
+type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Product = { id: string; name: string; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null };
 type Contact = { id: string; name: string; phone_number: string; address?: string | null };
 type OrderItem = { id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number };
@@ -21,6 +23,7 @@ const sections: { id: Section; label: string; icon: string; group: string }[] = 
   { id: "messages", label: "Conversaciones", icon: "◌", group: "ATENCIÓN" },
   { id: "handoffs", label: "Derivaciones", icon: "!", group: "ATENCIÓN" },
   { id: "contacts", label: "Contactos", icon: "◎", group: "ATENCIÓN" },
+  { id: "users", label: "Usuarios", icon: "♙", group: "CONFIGURACIÓN" },
 ];
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
@@ -38,10 +41,11 @@ function money(value: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(value);
 }
 
-export function KrokanticasPanel({ user }: { user: { displayName: string; email: string } }) {
+export function KrokanticasPanel({ user }: { user: { id: string; displayName: string; email: string; role: UserRole } }) {
   const [active, setActive] = useState<Section>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
   const name = user.displayName.includes("@") ? "Equipo Krokanticas" : user.displayName;
+  const visibleSections = sections.filter((section) => section.id !== "users" || ["owner", "admin"].includes(user.role));
   const choose = (section: Section) => { setActive(section); setMobileOpen(false); };
 
   return <div className="k-app">
@@ -49,11 +53,11 @@ export function KrokanticasPanel({ user }: { user: { displayName: string; email:
     <aside className={`k-sidebar ${mobileOpen ? "open" : ""}`}>
       <div className="k-brand"><span className="k-brand-mark">K</span><div><strong>KROKANTICAS</strong><small>Central de pedidos</small></div></div>
       <div className="k-wa pending"><i /> WhatsApp pendiente <span>POR INTEGRAR</span></div>
-      <nav aria-label="Navegación Krokanticas">{["OPERACIÓN", "ATENCIÓN"].map((group) => <div className="k-nav-group" key={group}><p>{group}</p>{sections.filter((section) => section.group === group).map((section) => <button key={section.id} className={active === section.id ? "active" : ""} onClick={() => choose(section.id)}><span>{section.icon}</span>{section.label}{["kitchen", "handoffs"].includes(section.id) && <b>●</b>}</button>)}</div>)}</nav>
-      <div className="k-sidebar-bottom"><div className="k-help"><strong>¿Necesitás intervenir?</strong><small>Usá Derivaciones para tomar reclamos o casos ambiguos.</small></div><div className="k-profile"><span>{name.slice(0, 2).toUpperCase()}</span><div><strong>{name}</strong><small>{user.email}</small></div><a href="/signout-with-chatgpt?return_to=/">Salir</a></div></div>
+      <nav aria-label="Navegación Krokanticas">{["OPERACIÓN", "ATENCIÓN", "CONFIGURACIÓN"].map((group) => visibleSections.some((section) => section.group === group) && <div className="k-nav-group" key={group}><p>{group}</p>{visibleSections.filter((section) => section.group === group).map((section) => <button key={section.id} className={active === section.id ? "active" : ""} onClick={() => choose(section.id)}><span>{section.icon}</span>{section.label}{["kitchen", "handoffs"].includes(section.id) && <b>●</b>}</button>)}</div>)}</nav>
+      <div className="k-sidebar-bottom"><div className="k-help"><strong>¿Necesitás intervenir?</strong><small>Usá Derivaciones para tomar reclamos o casos ambiguos.</small></div><div className="k-profile"><span>{name.slice(0, 2).toUpperCase()}</span><div><strong>{name}</strong><small>{user.email}</small></div><a href="/api/auth/logout">Salir</a></div></div>
     </aside>
     <main className="k-main">
-      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">☰</button><div><span>Krokanticas</span><b>/</b><strong>{sections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><PwaInstall /><span className="k-live">● Panel operativo</span></div></header>
+      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">☰</button><div><span>Krokanticas</span><b>/</b><strong>{visibleSections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><PwaInstall /><span className="k-live">● Panel operativo</span></div></header>
       <section className="k-content">
         {active === "overview" && <Overview onNavigate={choose} />}
         {active === "kitchen" && <KitchenModule />}
@@ -61,6 +65,7 @@ export function KrokanticasPanel({ user }: { user: { displayName: string; email:
         {active === "messages" && <div className="k-module"><MessagesModule businessId={BUSINESS_ID} /></div>}
         {active === "handoffs" && <HandoffsModule />}
         {active === "contacts" && <div className="k-module"><CustomersModule businessId={BUSINESS_ID} /></div>}
+        {active === "users" && ["owner", "admin"].includes(user.role) && <UsersModule currentUser={{ id: user.id, email: user.email, role: user.role }} />}
       </section>
     </main>
   </div>;
