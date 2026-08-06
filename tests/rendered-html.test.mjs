@@ -18,11 +18,14 @@ const exactRamayoEndpoints = [
 ];
 
 test("defines the authenticated Krokanticas operations panel", async () => {
-  const [page, layout, panel, operationalModules, auth, hosting] = await Promise.all([
+  const [page, layout, panel, operationalModules, pwaInstall, manifest, serviceWorker, auth, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("app/KrokanticasPanel.tsx", root), "utf8"),
     readFile(new URL("app/components/OperationalModules.tsx", root), "utf8"),
+    readFile(new URL("app/components/PwaInstall.tsx", root), "utf8"),
+    readFile(new URL("public/manifest.webmanifest", root), "utf8"),
+    readFile(new URL("public/sw.js", root), "utf8"),
     readFile(new URL("app/chatgpt-auth.ts", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
   ]);
@@ -37,6 +40,18 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(panel, /function HandoffsModule/);
   assert.match(panel, /WhatsApp pendiente/);
   assert.match(panel, /Object\.entries\(editItems\)/);
+  assert.match(panel, /<PwaInstall/);
+  assert.match(layout, /manifest: "\/manifest\.webmanifest"/);
+  assert.match(layout, /appleWebApp/);
+  assert.match(pwaInstall, /serviceWorker\.register\("\/sw\.js"/);
+  assert.match(pwaInstall, /beforeinstallprompt/);
+  assert.match(serviceWorker, /request\.mode === "navigate"/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
+  assert.match(serviceWorker, /caches\.match\("\/offline\.html"\)/);
+  const pwaManifest = JSON.parse(manifest);
+  assert.equal(pwaManifest.display, "standalone");
+  assert.equal(pwaManifest.start_url, "/");
+  assert.ok(pwaManifest.icons.some((icon) => icon.sizes === "512x512" && icon.purpose === "maskable"));
   assert.match(operationalModules, /export function MessagesModule/);
   assert.match(operationalModules, /address: form\.get\("address"\)/);
   assert.match(auth, /signin-with-chatgpt/);

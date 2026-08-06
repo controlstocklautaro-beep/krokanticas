@@ -1,0 +1,35 @@
+{
+  "id": "/",
+  "name": "Krokanticas · Central de pedidos",
+  "short_name": "Krokanticas",
+  "description": "Pedidos, cocina, stock y atención humana en una sola aplicación.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#faf7f1",
+  "theme_color": "#241b17",
+  "categories": ["business", "food", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/krokanticas-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/krokanticas-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/krokanticas-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

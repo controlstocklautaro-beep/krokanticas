@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CustomersModule, MessagesModule } from "./components/OperationalModules";
+import { PwaInstall } from "./components/PwaInstall";
 
 const BUSINESS_ID = "krokanticas";
 
@@ -48,7 +49,7 @@ export function KrokanticasPanel({ user }: { user: { displayName: string; email:
       <div className="k-sidebar-bottom"><div className="k-help"><strong>¿Necesitás intervenir?</strong><small>Usá Derivaciones para tomar reclamos o casos ambiguos.</small></div><div className="k-profile"><span>{name.slice(0, 2).toUpperCase()}</span><div><strong>{name}</strong><small>{user.email}</small></div><a href="/signout-with-chatgpt?return_to=/">Salir</a></div></div>
     </aside>
     <main className="k-main">
-      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">☰</button><div><span>Krokanticas</span><b>/</b><strong>{sections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><span className="k-live">● Panel operativo</span></div></header>
+      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">☰</button><div><span>Krokanticas</span><b>/</b><strong>{sections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><PwaInstall /><span className="k-live">● Panel operativo</span></div></header>
       <section className="k-content">
         {active === "overview" && <Overview onNavigate={choose} />}
         {active === "kitchen" && <KitchenModule />}

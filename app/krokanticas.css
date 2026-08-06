@@ -1,5 +1,5 @@
 :root { --k-orange:#b85416; --k-orange-2:#d36a22; --k-cream:#f7f1e6; --k-cream-2:#efe2cf; --k-brown:#2d211b; --k-muted:#786b62; --k-line:#e5d8c6; --k-green:#27785d; --k-gold:#b77720; }
-.k-app { min-height:100vh; display:flex; background:#faf7f1; color:var(--k-brown); }
+.k-app { min-height:100vh; min-height:100dvh; display:flex; background:#faf7f1; color:var(--k-brown); -webkit-tap-highlight-color:transparent; }
 .k-sidebar { width:260px; min-height:100vh; position:fixed; inset:0 auto 0 0; z-index:40; display:flex; flex-direction:column; padding:24px 16px 16px; color:#fff9f1; background:#241b17; border-right:1px solid #3a2b24; }
 .k-brand { display:flex; align-items:center; gap:11px; padding:0 8px 22px; }.k-brand-mark { width:39px; height:39px; display:grid; place-items:center; border-radius:12px 12px 12px 4px; color:#fff; background:linear-gradient(145deg,var(--k-orange-2),var(--k-orange)); font-family:Georgia,serif; font-size:23px; font-weight:800; box-shadow:0 9px 25px #0005; }.k-brand strong,.k-brand small { display:block; }.k-brand strong { font-family:Georgia,serif; font-size:15px; letter-spacing:.09em; }.k-brand small { margin-top:3px; color:#aa9c92; font-size:8px; letter-spacing:.06em; }
 .k-wa { display:flex; align-items:center; gap:7px; margin-bottom:27px; padding:9px 10px; border:1px solid #3a453a; border-radius:9px; color:#b9d8c7; background:#243029; font-size:8px; font-weight:700; }.k-wa i { width:7px; height:7px; border-radius:50%; background:#40aa79; box-shadow:0 0 0 3px #40aa7925; }.k-wa span { margin-left:auto; color:#7ca68d; font-size:6px; letter-spacing:.1em; }
@@ -15,6 +15,15 @@
 .k-modal { max-height:92vh; overflow-y:auto; }.k-modal label { color:#62554d; }.k-order-modal { width:min(620px,100%); }.k-product-picker { max-height:245px; margin:0 0 13px; padding:7px 12px 12px; overflow-y:auto; border:1px solid var(--k-line); border-radius:9px; }.k-product-picker legend { padding:0 6px; color:#62554d; font-size:9px; font-weight:700; }.k-product-picker > div { min-height:45px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid #f0e7dc; }.k-product-picker strong,.k-product-picker small { display:block; }.k-product-picker strong { font-size:8px; }.k-product-picker small { margin-top:3px; color:var(--k-muted); font-size:7px; }
 .k-module .module-heading h1 { font-family:Georgia,serif; }.k-module .eyebrow { color:var(--k-orange); }.k-module .primary,.k-module .chat-compose .send { border-color:var(--k-orange); background:var(--k-orange); }.k-module .chat-list > button.selected { background:#fff5ec; box-shadow:inset 3px 0 var(--k-orange); }.k-module .bubble.outgoing { background:var(--k-orange); }
 .k-overlay { display:none; }
+
+.k-install-wrap { position:relative; }
+.k-install { min-height:34px; padding:0 11px; border:1px solid #dfc9b3; border-radius:9px; color:#7d491f; background:#fff8ee; font-size:10px; font-weight:750; white-space:nowrap; }
+.k-install-help { width:270px; position:absolute; top:calc(100% + 9px); right:0; z-index:50; display:grid; gap:7px; padding:14px; border:1px solid var(--k-line); border-radius:11px; background:#fff; box-shadow:0 16px 45px #2d211b26; }
+.k-install-help strong { color:var(--k-brown); font-size:12px; }
+.k-install-help span { color:var(--k-muted); font-size:10px; line-height:1.45; }
+.k-pwa-state { padding:7px 10px; border-radius:15px; font-size:10px; font-weight:750; white-space:nowrap; }
+.k-pwa-state.installed { color:var(--k-green); background:#e4f2eb; }
+.k-pwa-state.offline { color:#9a4b35; background:#fae4dc; }
 @media (max-width:1050px) { .k-stock-grid { grid-template-columns:repeat(2,1fr); }.k-overview-grid { grid-template-columns:1fr; } }
 @media (max-width:780px) { .k-sidebar { transform:translateX(-105%); transition:transform .24s ease; }.k-sidebar.open { transform:translateX(0); }.k-overlay { display:block; position:fixed; inset:0; z-index:35; border:0; background:#1a110c99; }.k-main { width:100%; margin-left:0; }.k-topbar { height:59px; padding:0 14px; }.k-menu { display:block; }.k-topbar > div:first-of-type { margin-right:auto; margin-left:10px; }.k-content { padding:22px 14px 50px; }.k-heading { align-items:flex-start; flex-direction:column; margin-bottom:21px; }.k-heading .k-primary,.k-heading .k-search { width:100%; }.k-settings,.k-kpis { grid-template-columns:1fr; }.k-settings button { min-height:84px; }.k-kpis article { min-height:88px; }.k-stock-grid,.k-order-grid { grid-template-columns:1fr; }.k-order-card { border-radius:11px; }.k-order-actions { position:sticky; bottom:0; background:#fff; }.k-order-actions button { min-height:40px; }.k-module .messages-layout { min-height:calc(100vh - 210px); }.k-module .module-heading { align-items:flex-start; flex-direction:column; }.k-module .module-heading .primary { width:100%; }.k-live { display:none; } }
 @media (max-width:430px) { .k-heading h1 { font-size:30px; }.k-top-actions { gap:4px; }.k-order-actions { flex-wrap:wrap; }.k-order-actions .main { flex-basis:100%; }.k-modal { padding:18px; }.k-product-picker { max-height:205px; } }
@@ -39,6 +48,17 @@
   .k-kpis small,.k-kpis em { font-size:11px; }.k-mini-order strong { font-size:13px; }.k-mini-order small,.k-mini-order em { font-size:11px; }
   .k-order-person p,.k-order-note { font-size:11px; }.k-order-items > div { font-size:12px; }.k-order-actions button { min-height:44px; font-size:11px; }
   .k-module .chat-list > button { min-height:78px; }.k-module .chat-list strong { font-size:13px; }.k-module .chat-list small { font-size:11px; }.k-module .bubble { font-size:13px; }
+  .k-sidebar { padding-top:calc(24px + env(safe-area-inset-top)); padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  .k-topbar { height:calc(59px + env(safe-area-inset-top)); padding-top:env(safe-area-inset-top); padding-right:max(14px,env(safe-area-inset-right)); padding-left:max(14px,env(safe-area-inset-left)); }
+  .k-content { padding-right:max(14px,env(safe-area-inset-right)); padding-bottom:calc(50px + env(safe-area-inset-bottom)); padding-left:max(14px,env(safe-area-inset-left)); }
+  .k-app .modal input,.k-app .modal select,.k-app .modal textarea,.k-search input,.k-module .chat-compose input,.k-module .chat-search input { font-size:16px; }
+  .k-install { min-height:38px; font-size:11px; }
+  .k-install-help { width:min(270px,calc(100vw - 28px)); right:0; }
+}
+
+@media (display-mode:standalone) {
+  html,body { overscroll-behavior-y:none; }
+  .k-app button { touch-action:manipulation; }
 }
 
 /* Krokanticas operational extensions. */
