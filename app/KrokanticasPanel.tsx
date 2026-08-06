@@ -25,6 +25,10 @@ const sections: { id: Section; label: string; icon: string; group: string }[] = 
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(`El servidor no pudo cargar los datos (${response.status}). Recargá la página e intentá nuevamente.`);
+  }
   const data = await response.json() as T & { error?: string };
   if (!response.ok) throw new Error(data.error || "No se pudo completar la operación");
   return data;
