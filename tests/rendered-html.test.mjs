@@ -18,14 +18,16 @@ const exactRamayoEndpoints = [
 ];
 
 test("defines the authenticated Krokanticas operations panel", async () => {
-  const [page, layout, panel, operationalModules, pwaInstall, manifest, serviceWorker, auth, hosting] = await Promise.all([
+  const [page, layout, panel, panelStyles, operationalModules, pwaInstall, manifest, serviceWorker, n8nGuide, auth, hosting] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("app/KrokanticasPanel.tsx", root), "utf8"),
+    readFile(new URL("app/krokanticas.css", root), "utf8"),
     readFile(new URL("app/components/OperationalModules.tsx", root), "utf8"),
     readFile(new URL("app/components/PwaInstall.tsx", root), "utf8"),
     readFile(new URL("public/manifest.webmanifest", root), "utf8"),
     readFile(new URL("public/sw.js", root), "utf8"),
+    readFile(new URL("docs/KROKANTICAS_N8N_HANDOFF.md", root), "utf8"),
     readFile(new URL("app/chatgpt-auth.ts", root), "utf8"),
     readFile(new URL(".openai/hosting.json", root), "utf8"),
   ]);
@@ -48,6 +50,11 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(serviceWorker, /request\.mode === "navigate"/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(serviceWorker, /caches\.match\("\/offline\.html"\)/);
+  assert.match(panelStyles, /Application typography/);
+  assert.match(panelStyles, /font-size:clamp\(36px,3\.2vw,48px\)/);
+  assert.match(panelStyles, /\.k-module \.bubble \{[^}]*font-size:15px/);
+  for (const endpoint of exactRamayoEndpoints) assert.match(n8nGuide, new RegExp(`/api/${endpoint}`));
+  assert.match(n8nGuide, /No se crea comanda antes de una confirmación explícita/);
   const pwaManifest = JSON.parse(manifest);
   assert.equal(pwaManifest.display, "standalone");
   assert.equal(pwaManifest.start_url, "/");
@@ -100,9 +107,11 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.match(kitchenStore, /DELETE FROM order_items/);
   assert.match(kitchenStore, /subtotal = prepared\.reduce/);
   const stock = await readFile(new URL("app/api/stock/route.ts", root), "utf8");
+  const contacts = await readFile(new URL("app/api/contacts/route.ts", root), "utf8");
   const adjust = await readFile(new URL("app/api/stock/adjust/route.ts", root), "utf8");
   assert.match(stock, /stock_status/);
   assert.match(adjust, /Stock insuficiente/);
+  assert.match(contacts, /searchParams\.get\("phone_number"\)/);
   const krokanticasMigration = await readFile(new URL("drizzle/0002_daffy_proemial_gods.sql", root), "utf8");
   assert.match(krokanticasMigration, /CREATE TABLE `products`/);
   assert.match(krokanticasMigration, /CREATE TABLE `orders`/);

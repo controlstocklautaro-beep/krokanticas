@@ -61,6 +61,189 @@
   .k-app button { touch-action:manipulation; }
 }
 
+/* Application typography: readable at normal zoom on desktop and mobile. */
+.k-app {
+  font-family:var(--font-geist-sans),Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px;
+  font-weight:450;
+  letter-spacing:-.012em;
+}
+.k-app h1,.k-app h2,.k-app h3,.k-brand strong,.k-settings strong,.k-kpis strong,.k-order-head time,.k-order-meta strong {
+  font-family:inherit;
+  font-weight:760;
+  letter-spacing:-.035em;
+}
+
+/* Navigation and top bar. */
+.k-brand strong { font-size:17px; letter-spacing:.08em; }
+.k-brand small { margin-top:4px; font-size:12px; letter-spacing:.02em; }
+.k-wa { min-height:42px; font-size:12px; }
+.k-wa span { font-size:9px; }
+.k-nav-group p { font-size:10px; }
+.k-nav-group button { min-height:46px; font-size:14px; }
+.k-help strong { font-size:13px; }
+.k-help small { font-size:11px; line-height:1.5; }
+.k-profile strong { font-size:13px; }
+.k-profile small,.k-profile a { font-size:10px; }
+.k-topbar > div:first-of-type { font-size:14px; }
+.k-live,.k-install,.k-pwa-state { font-size:12px; }
+
+/* Shared headings, actions and empty states. */
+.k-eyebrow,.k-module .eyebrow { margin-bottom:9px; font-size:11px; letter-spacing:.13em; }
+.k-heading,.k-module .module-heading { min-height:96px; margin-bottom:30px; }
+.k-heading h1,.k-module .module-heading h1 { margin-bottom:10px; font-size:clamp(36px,3.2vw,48px); line-height:1.04; }
+.k-heading p,.k-module .module-heading p { max-width:720px; font-size:16px; line-height:1.55; }
+.k-primary,.k-module .primary,.k-app .secondary { min-height:46px; padding-inline:18px; font-size:14px; border-radius:11px; }
+.k-error,.k-empty,.k-module .module-error,.k-module .empty-list,.k-module .empty-table,.k-module .chat-empty-state { font-size:14px; line-height:1.5; }
+.k-module .sync-badge { padding:9px 13px; font-size:12px; }
+
+/* Inicio. */
+.k-settings button { min-height:118px; padding:20px; }
+.k-settings span { font-size:11px; }
+.k-settings strong { margin:9px 0 6px; font-size:25px; }
+.k-settings small { font-size:12px; }
+.k-kpis article { min-height:122px; gap:17px; padding:19px; }
+.k-kpis article > span { width:48px; height:48px; font-size:20px; }
+.k-kpis small { font-size:12px; }
+.k-kpis strong { margin:4px 0; font-size:31px; }
+.k-kpis em { font-size:12px; line-height:1.45; }
+.k-card-head { min-height:76px; padding:16px 20px; }
+.k-card-head h2 { font-size:20px; }
+.k-card-head button { font-size:13px; }
+.k-mini-order { min-height:76px; grid-template-columns:52px 1fr auto; padding:0 20px; }
+.k-mini-order > b { font-size:13px; }
+.k-mini-order strong { font-size:15px; }
+.k-mini-order small,.k-mini-order em { font-size:12px; }
+.k-quick button { min-height:70px; }
+.k-quick button > span { width:40px; height:40px; font-size:17px; }
+.k-quick strong { font-size:15px; }
+.k-quick small { font-size:12px; }
+.k-integration-list span { font-size:14px; }
+.k-integration-list b,.k-integrations .k-card-head > small { font-size:11px; }
+
+/* Conversaciones. */
+.k-module .messages-layout { grid-template-columns:minmax(360px,410px) 1fr; min-height:600px; }
+.k-module .chat-search { min-height:68px; padding:0 18px; }
+.k-module .chat-search input { min-height:42px; padding-inline:12px; font-size:14px; }
+.k-module .chat-list > button { min-height:88px; grid-template-columns:42px 1fr auto; gap:12px; padding:13px 17px; }
+.k-module .guest-avatar { width:40px; height:40px; font-size:12px; }
+.k-module .chat-list strong { font-size:15px; }
+.k-module .chat-list small { margin-top:5px; font-size:12px; }
+.k-module .chat-list time { font-size:11px; }
+.k-module .real-messages .chat-list button i { margin-top:6px; padding:4px 7px; font-size:10px; }
+.k-module .chat-window { grid-template-rows:70px 1fr 68px; }
+.k-module .chat-person { padding:0 20px; }
+.k-module .chat-person strong { font-size:15px; }
+.k-module .chat-person small { margin-top:3px; font-size:12px; }
+.k-module .chat-tools > button,.k-module .tag-control > button { min-height:36px; padding:0 11px; font-size:12px; }
+.k-module .tag-popover { width:230px; }
+.k-module .tag-popover button { min-height:40px; font-size:12px; }
+.k-module .tag-popover small { font-size:11px; }
+.k-module .chat-body { gap:10px; padding:26px; }
+.k-module .bubble { padding:12px 14px; border-radius:14px; font-size:15px; line-height:1.55; }
+.k-module .real-chat-body .bubble time { font-size:10px; }
+.k-module .chat-compose { gap:10px; padding:0 16px; }
+.k-module .chat-compose input:not(.hidden-file) { min-height:44px; padding-inline:13px; font-size:14px; }
+.k-module .chat-compose button { width:42px; height:42px; font-size:16px; }
+.k-module .chat-empty-state strong { font-size:15px; }
+.k-module .chat-empty-state small { font-size:12px; }
+
+/* Contactos and data tables. */
+.k-module .table-tools { min-height:72px; padding:14px 18px; }
+.k-module .table-tools .search { min-height:42px; }
+.k-module .table-tools .search input { font-size:14px; }
+.k-module .record-count { font-size:12px; }
+.k-module .data-row { min-height:70px; padding-inline:20px; font-size:14px; }
+.k-module .data-head { min-height:46px; font-size:11px; }
+.k-module .customer-cell strong { font-size:14px; }
+.k-module .state-pill { padding:6px 9px; font-size:11px; }
+.k-module .row-actions button,.k-module .tag-admin-card button { min-height:34px; padding:0 10px; font-size:11px; }
+
+/* Stock. */
+.k-search { width:280px; min-height:44px; padding-inline:13px; }
+.k-search input { font-size:14px; }
+.k-stock-card { min-height:210px; padding:20px; }
+.k-food-icon { width:42px; height:42px; font-size:19px; }
+.k-stock-state { padding:6px 9px; font-size:10px; }
+.k-stock-card h2 { margin:20px 0 7px; font-size:21px; }
+.k-stock-card > p,.k-stock-bottom > small { font-size:13px; }
+.k-stepper button { width:36px; height:36px; font-size:18px; }
+.k-stepper strong,.k-stepper b { font-size:16px; }
+.k-edit { min-height:36px; padding:0 11px; font-size:12px; }
+
+/* Cocina. */
+.k-tabs button { min-height:42px; padding-inline:15px; font-size:13px; }
+.k-order-head { min-height:62px; padding-inline:18px; }
+.k-order-head span { font-size:14px; }
+.k-order-head b { padding:6px 9px; font-size:10px; }
+.k-order-head time { font-size:21px; }
+.k-order-person { padding:18px 18px 11px; }
+.k-order-person > span { width:42px; height:42px; font-size:11px; }
+.k-order-person h2 { font-size:20px; }
+.k-order-person p { font-size:13px; }
+.k-order-items { padding:7px 18px 12px; }
+.k-order-items > div { min-height:38px; grid-template-columns:34px 1fr auto; font-size:14px; }
+.k-order-meta { padding:13px 18px; }
+.k-order-meta span { padding:6px 8px; font-size:11px; }
+.k-order-meta strong { font-size:19px; }
+.k-order-note { padding:13px 18px; font-size:13px; }
+.k-order-actions { gap:7px; padding:13px; }
+.k-order-actions button { min-height:40px; padding-inline:12px; font-size:12px; }
+.k-product-picker legend { font-size:14px; }
+.k-product-picker > div { min-height:56px; }
+.k-product-picker strong { font-size:14px; }
+.k-product-picker small,.k-form-note { font-size:12px; }
+
+/* Derivaciones. */
+.k-handoff-head { min-height:64px; padding:12px 18px; }
+.k-handoff-head .k-priority { font-size:10px; }
+.k-handoff-head span,.k-handoff-head time { font-size:12px; }
+.k-handoff-person { padding:18px 18px 10px; }
+.k-handoff-person > span { width:44px; height:44px; font-size:12px; }
+.k-handoff-person h2 { font-size:20px; }
+.k-handoff-person p { font-size:13px; }
+.k-handoff-summary { min-height:74px; padding:10px 18px 16px; font-size:15px; }
+.k-handoff-owner { min-height:56px; padding:10px 18px; }
+.k-handoff-owner > span,.k-handoff-owner select { font-size:12px; }
+.k-handoff-actions button { min-height:40px; font-size:12px; }
+
+/* Forms and modals. */
+.k-app .modal { width:min(520px,100%); padding:28px; }
+.k-app .k-order-modal { width:min(700px,100%); }
+.k-app .modal-head h2 { font-size:25px; }
+.k-app .modal label { gap:8px; margin-bottom:16px; font-size:14px; }
+.k-app .modal input,.k-app .modal select,.k-app .modal textarea { min-height:46px; padding:11px 12px; font-size:15px; }
+.k-app .modal textarea { min-height:88px; }
+
+@media (max-width:780px) {
+  .k-heading,.k-module .module-heading { min-height:auto; margin-bottom:24px; }
+  .k-heading h1,.k-module .module-heading h1 { font-size:34px; line-height:1.08; }
+  .k-heading p,.k-module .module-heading p { font-size:15px; }
+  .k-module .messages-layout { grid-template-columns:1fr; min-height:calc(100dvh - 220px); }
+  .k-module .chat-list { max-height:320px; }
+  .k-module .chat-window { min-height:520px; }
+  .k-module .chat-body { padding:18px 14px; }
+  .k-module .bubble { max-width:84%; font-size:15px; }
+  .k-module .chat-tools > button,.k-module .tag-control > button { padding-inline:8px; font-size:11px; }
+  .k-module .data-row { font-size:13px; }
+  .k-settings button { min-height:104px; }
+  .k-kpis article { min-height:104px; }
+  .k-stock-card { min-height:190px; }
+  .k-order-actions button,.k-handoff-actions button { min-height:46px; font-size:13px; }
+  .k-app .modal { padding:20px; border-radius:18px; }
+  .k-app .modal label { font-size:14px; }
+  .k-install-help { font-size:13px; }
+}
+
+@media (max-width:430px) {
+  .k-topbar > div:first-of-type { font-size:13px; }
+  .k-heading h1,.k-module .module-heading h1 { font-size:31px; }
+  .k-primary,.k-module .primary { width:100%; }
+  .k-module .chat-list > button { min-height:92px; }
+  .k-module .chat-person { padding-inline:12px; }
+  .k-module .chat-tools > button,.k-module .tag-control > button { padding-inline:6px; font-size:10px; }
+}
+
 /* Krokanticas operational extensions. */
 .k-wa.pending { border-color:#5c482d; color:#e7c88d; background:#342a20; }
 .k-wa.pending i { background:#d89b3e; box-shadow:0 0 0 3px #d89b3e25; }

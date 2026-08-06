@@ -7,7 +7,12 @@ export async function GET(req: Request) {
   try {
     const businessId = businessIdFrom(req);
     await requireBusinessAccess(req, businessId, { allowIntegration: true });
-    const result = await getD1().prepare(`
+    const rawPhone = new URL(req.url).searchParams.get("phone_number");
+    const phoneNumber = rawPhone ? normalizePhone(rawPhone) : null;
+    const result = phoneNumber ? await getD1().prepare(`
+      SELECT id, phone_number, name, email, address, notes, agent_active, created_at, updated_at
+      FROM contacts WHERE business_id = ? AND phone_number = ? ORDER BY created_at DESC
+    `).bind(businessId, phoneNumber).all() : await getD1().prepare(`
       SELECT id, phone_number, name, email, address, notes, agent_active, created_at, updated_at
       FROM contacts WHERE business_id = ? ORDER BY created_at DESC
     `).bind(businessId).all();

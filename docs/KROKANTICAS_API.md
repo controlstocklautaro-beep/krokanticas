@@ -1,10 +1,12 @@
 # API del panel Krokanticas
 
+La entrega completa para implementar n8n, incluidos flujos, responsabilidades, ejemplos y pruebas de aceptación, está en `docs/KROKANTICAS_N8N_HANDOFF.md`.
+
 Todas las rutas usan JSON y requieren `businessId: "krokanticas"`. Las integraciones de n8n deben enviar `Authorization: Bearer <BUSINESS_INTEGRATION_KEY>` o `x-business-key`. El panel web usa la identidad autenticada de Sites.
 
 ## Contactos
 
-- `GET /api/contacts?businessId=krokanticas`: lista contactos, incluida la propiedad `address`.
+- `GET /api/contacts?businessId=krokanticas`: lista contactos, incluida la propiedad `address`. Admite `phone_number` para buscar un contacto exacto.
 - `POST /api/contacts`: crea un contacto.
 - `PATCH /api/contacts`: edita un contacto por `id`.
 - `DELETE /api/contacts`: elimina un contacto por `id`.
