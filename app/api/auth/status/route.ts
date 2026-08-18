@@ -13,7 +13,7 @@ export async function GET(req: Request) {
       authenticated: Boolean(user),
       user,
       needsSetup,
-      setupAllowed: needsSetup && (process.env.NODE_ENV !== "production" || Boolean(req.headers.get("oai-authenticated-user-id"))),
+      setupAllowed: needsSetup && (process.env.NODE_ENV !== "production" || Boolean(process.env.INITIAL_ADMIN_SETUP_TOKEN)),
     });
   } catch (error) {
     return apiErrorResponse(error, "Error consultando autenticación");

@@ -1,4 +1,13 @@
-import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { bigint, doublePrecision, index, pgTable, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
+
+// El modelo conserva milisegundos Unix y flags 0/1 para no alterar los contratos
+// existentes de la API durante la migración desde D1 a PostgreSQL.
+const sqliteTable = pgTable;
+const integer = (name: string, config?: unknown) => {
+  void config;
+  return bigint(name, { mode: "number" });
+};
+const real = doublePrecision;
 
 export const businesses = sqliteTable("businesses", {
   id: text("id").primaryKey(),
@@ -15,11 +24,32 @@ export const memberships = sqliteTable("memberships", {
   userId: text("user_id").notNull(),
   email: text("email"),
   role: text("role").notNull().default("staff"),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: integer("active", { mode: "boolean" }).notNull().default(1),
   createdAt: integer("created_at").notNull(),
 }, (table) => [
   primaryKey({ columns: [table.businessId, table.userId] }),
   index("memberships_user_idx").on(table.userId),
+]);
+
+export const businessModules = sqliteTable("business_modules", {
+  businessId: text("business_id").notNull(),
+  module: text("module").notNull(),
+  enabled: integer("enabled").notNull().default(1),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.businessId, table.module] }),
+  index("business_modules_business_idx").on(table.businessId),
+]);
+
+export const businessIntegrations = sqliteTable("business_integrations", {
+  businessId: text("business_id").notNull(),
+  provider: text("provider").notNull(),
+  enabled: integer("enabled").notNull().default(0),
+  configuration: text("configuration").notNull().default("{}"),
+  updatedAt: integer("updated_at").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.businessId, table.provider] }),
+  index("business_integrations_business_idx").on(table.businessId),
 ]);
 
 export const appUsers = sqliteTable("app_users", {
@@ -27,8 +57,8 @@ export const appUsers = sqliteTable("app_users", {
   email: text("email").notNull(),
   name: text("name").notNull(),
   passwordHash: text("password_hash").notNull(),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
-  mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(false),
+  active: integer("active", { mode: "boolean" }).notNull().default(1),
+  mustChangePassword: integer("must_change_password", { mode: "boolean" }).notNull().default(0),
   lastLoginAt: integer("last_login_at"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
@@ -67,7 +97,7 @@ export const contacts = sqliteTable("contacts", {
   email: text("email"),
   address: text("address"),
   notes: text("notes"),
-  agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(true),
+  agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(1),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, (table) => [
@@ -80,7 +110,7 @@ export const chats = sqliteTable("chats", {
   businessId: text("business_id").notNull(),
   phoneNumber: text("phone_number").notNull(),
   userName: text("user_name").notNull(),
-  agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(true),
+  agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(1),
   updatedAt: integer("updated_at").notNull(),
 }, (table) => [
   uniqueIndex("chats_business_phone_uq").on(table.businessId, table.phoneNumber),
@@ -97,7 +127,7 @@ export const messages = sqliteTable("messages", {
   status: text("status"),
   storagePath: text("storage_path"),
   contentType: text("content_type"),
-  mediaDeleted: integer("media_deleted", { mode: "boolean" }).notNull().default(false),
+  mediaDeleted: integer("media_deleted", { mode: "boolean" }).notNull().default(0),
   mediaDeletedAt: integer("media_deleted_at"),
   createdAt: integer("created_at").notNull(),
 }, (table) => [
@@ -173,9 +203,9 @@ export const pipelineLeads = sqliteTable("pipeline_leads", {
 
 export const businessSettings = sqliteTable("business_settings", {
   businessId: text("business_id").primaryKey(),
-  storeOpen: integer("store_open", { mode: "boolean" }).notNull().default(true),
+  storeOpen: integer("store_open", { mode: "boolean" }).notNull().default(1),
   delayMinutes: integer("delay_minutes").notNull().default(30),
-  courierActive: integer("courier_active", { mode: "boolean" }).notNull().default(true),
+  courierActive: integer("courier_active", { mode: "boolean" }).notNull().default(1),
   updatedAt: integer("updated_at").notNull(),
 });
 
@@ -185,7 +215,7 @@ export const products = sqliteTable("products", {
   name: text("name").notNull(),
   price: real("price").notNull(),
   aliases: text("aliases").notNull().default("[]"),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: integer("active", { mode: "boolean" }).notNull().default(1),
   stockStatus: text("stock_status").notNull().default("available"),
   stockQuantity: integer("stock_quantity"),
   createdAt: integer("created_at").notNull(),

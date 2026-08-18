@@ -48,7 +48,11 @@ export async function PATCH(req: Request) {
     await db.batch([
       db.prepare("UPDATE tags SET name = ?, color = ?, updated_at = ? WHERE id = ? AND business_id = ?")
         .bind(name, color, Date.now(), body.id, businessId),
-      db.prepare("UPDATE OR IGNORE chat_tags SET tag = ? WHERE business_id = ? AND tag = ?")
+      db.prepare(`DELETE FROM chat_tags old_tag WHERE old_tag.business_id = ? AND old_tag.tag = ? AND EXISTS (
+        SELECT 1 FROM chat_tags new_tag WHERE new_tag.business_id = old_tag.business_id
+        AND new_tag.phone_number = old_tag.phone_number AND new_tag.tag = ?
+      )`).bind(businessId, current.name, name),
+      db.prepare("UPDATE chat_tags SET tag = ? WHERE business_id = ? AND tag = ?")
         .bind(name, businessId, current.name),
     ]);
     return NextResponse.json({ success: true });

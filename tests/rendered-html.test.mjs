@@ -18,7 +18,7 @@ const exactRamayoEndpoints = [
 ];
 
 test("defines the authenticated Krokanticas operations panel", async () => {
-  const [page, layout, panel, panelStyles, operationalModules, pwaInstall, manifest, serviceWorker, n8nGuide, authForms, appAuth, usersModule, hosting] = await Promise.all([
+  const [page, layout, panel, panelStyles, operationalModules, pwaInstall, manifest, serviceWorker, n8nGuide, authForms, appAuth, usersModule, packageJson, database] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/layout.tsx", root), "utf8"),
     readFile(new URL("app/KrokanticasPanel.tsx", root), "utf8"),
@@ -31,15 +31,17 @@ test("defines the authenticated Krokanticas operations panel", async () => {
     readFile(new URL("app/components/AuthForms.tsx", root), "utf8"),
     readFile(new URL("lib/server/app-auth.ts", root), "utf8"),
     readFile(new URL("app/components/UsersModule.tsx", root), "utf8"),
-    readFile(new URL(".openai/hosting.json", root), "utf8"),
+    readFile(new URL("package.json", root), "utf8"),
+    readFile(new URL("db/index.ts", root), "utf8"),
   ]);
 
   assert.match(page, /getAppUserBySessionToken/);
   assert.match(page, /redirect\("\/login"\)/);
   assert.match(page, /<KrokanticasPanel/);
   assert.match(layout, /Krokanticas \| Central de pedidos/);
-  assert.match(panel, /MessagesModule businessId=\{BUSINESS_ID\}/);
-  assert.match(panel, /CustomersModule businessId=\{BUSINESS_ID\}/);
+  assert.match(panel, /MessagesModule businessId=\{business\.id\}/);
+  assert.match(panel, /CustomersModule businessId=\{business\.id\}/);
+  assert.match(panel, /\/api\/businesses/);
   assert.match(panel, /function StockModule/);
   assert.match(panel, /function KitchenModule/);
   assert.match(panel, /function HandoffsModule/);
@@ -74,9 +76,13 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(appAuth, /HttpOnly; SameSite=Lax/);
   assert.match(usersModule, /\/api\/users/);
 
-  const hostingConfig = JSON.parse(hosting);
-  assert.equal(hostingConfig.d1, "DB");
-  assert.equal(hostingConfig.r2, "MEDIA");
+  const project = JSON.parse(packageJson);
+  assert.equal(project.scripts.build, "next build");
+  assert.ok(project.dependencies["@supabase/supabase-js"]);
+  assert.ok(project.dependencies.postgres);
+  assert.match(database, /DATABASE_URL/);
+  assert.match(database, /SUPABASE_SECRET_KEY/);
+  assert.match(database, /SupabaseMediaBucket/);
 });
 
 test("keeps every Ramayo endpoint name exactly", async () => {
@@ -100,9 +106,13 @@ test("includes persistent operational APIs and migrations", async () => {
     assert.match(source, /requireBusinessAccess/);
   }
 
-  const migration = await readFile(new URL("drizzle/0001_mute_sleeper.sql", root), "utf8");
-  assert.match(migration, /CREATE TABLE `tags`/);
-  assert.match(migration, /CREATE TABLE `transactions`/);
+  const migrationNames = await readdir(new URL("supabase/migrations/", root));
+  const initialMigrationName = migrationNames.find((name) => name.endsWith(".sql"));
+  assert.ok(initialMigrationName, "Missing Supabase PostgreSQL migration");
+  const migration = await readFile(new URL(`supabase/migrations/${initialMigrationName}`, root), "utf8");
+  assert.match(migration, /CREATE TABLE "tags"/);
+  assert.match(migration, /CREATE TABLE "transactions"/);
+  assert.match(migration, /CREATE TABLE "business_modules"/);
 
   for (const endpoint of ["create", "edit", "delete", "orders"]) {
     const source = await readFile(new URL(`app/api/kitchen/${endpoint}/route.ts`, root), "utf8");
@@ -123,19 +133,11 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.match(stock, /stock_status/);
   assert.match(adjust, /Stock insuficiente/);
   assert.match(contacts, /searchParams\.get\("phone_number"\)/);
-  const krokanticasMigration = await readFile(new URL("drizzle/0002_daffy_proemial_gods.sql", root), "utf8");
-  assert.match(krokanticasMigration, /CREATE TABLE `products`/);
-  assert.match(krokanticasMigration, /CREATE TABLE `orders`/);
-  assert.match(krokanticasMigration, /ALTER TABLE `contacts` ADD `address`/);
-  const migrations = await readdir(new URL("drizzle/", root));
-  const handoffMigrationName = migrations.find((name) => name.startsWith("0003_") && name.endsWith(".sql"));
-  assert.ok(handoffMigrationName, "Missing handoffs migration");
-  const handoffMigration = await readFile(new URL(`drizzle/${handoffMigrationName}`, root), "utf8");
-  assert.match(handoffMigration, /CREATE TABLE `handoffs`/);
-  const authMigrationName = migrations.find((name) => name.startsWith("0004_") && name.endsWith(".sql"));
-  assert.ok(authMigrationName, "Missing application authentication migration");
-  const authMigration = await readFile(new URL(`drizzle/${authMigrationName}`, root), "utf8");
-  assert.match(authMigration, /CREATE TABLE `app_users`/);
-  assert.match(authMigration, /CREATE TABLE `app_sessions`/);
-  assert.match(authMigration, /CREATE TABLE `password_reset_tokens`/);
+  assert.match(migration, /CREATE TABLE "products"/);
+  assert.match(migration, /CREATE TABLE "orders"/);
+  assert.match(migration, /"address" text/);
+  assert.match(migration, /CREATE TABLE "handoffs"/);
+  assert.match(migration, /CREATE TABLE "app_users"/);
+  assert.match(migration, /CREATE TABLE "app_sessions"/);
+  assert.match(migration, /CREATE TABLE "password_reset_tokens"/);
 });

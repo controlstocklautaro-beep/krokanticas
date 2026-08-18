@@ -3,6 +3,7 @@ import { ensureSchema } from "@/db/ensure-schema";
 import { ApiError } from "./api-utils";
 
 export const SESSION_COOKIE = "krokanticas_session";
+export const ACTIVE_BUSINESS_COOKIE = "nexo_business";
 export const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 export const RESET_DURATION_MS = 30 * 60 * 1000;
 const PASSWORD_ITERATIONS = 180_000;
@@ -15,6 +16,9 @@ export type AppUser = {
   role: AppRole;
   active: boolean;
   mustChangePassword: boolean;
+  businessId: string;
+  businessName: string;
+  modules: string[];
 };
 
 function bytesToBase64Url(bytes: Uint8Array): string {
@@ -97,18 +101,33 @@ export function sessionTokenFromCookieHeader(cookieHeader: string | null): strin
   return null;
 }
 
-export async function getAppUserBySessionToken(token: string | null, businessId = "krokanticas"): Promise<AppUser | null> {
+export function activeBusinessIdFromCookieHeader(cookieHeader: string | null): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const [name, ...valueParts] = part.trim().split("=");
+    if (name === ACTIVE_BUSINESS_COOKIE) return decodeURIComponent(valueParts.join("="));
+  }
+  return null;
+}
+
+export async function getAppUserBySessionToken(token: string | null, businessId?: string | null): Promise<AppUser | null> {
   if (!token) return null;
   await ensureSchema();
   const tokenHash = await sha256(token);
   const row = await getD1().prepare(`
-    SELECT u.id, u.email, u.name, u.active, u.must_change_password, m.role, m.active AS membership_active
+    SELECT u.id, u.email, u.name, u.active, u.must_change_password, m.role, m.active AS membership_active,
+      m.business_id, b.name AS business_name
     FROM app_sessions s
     JOIN app_users u ON u.id = s.user_id
-    JOIN memberships m ON m.user_id = u.id AND m.business_id = ?
-    WHERE s.token_hash = ? AND s.expires_at > ?
-  `).bind(businessId, tokenHash, Date.now()).first<Record<string, unknown>>();
+    JOIN memberships m ON m.user_id = u.id
+    JOIN businesses b ON b.id = m.business_id
+    WHERE s.token_hash = ? AND s.expires_at > ? AND (CAST(? AS TEXT) IS NULL OR m.business_id = ?)
+    ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, m.created_at ASC
+    LIMIT 1
+  `).bind(tokenHash, Date.now(), businessId ?? null, businessId ?? null).first<Record<string, unknown>>();
   if (!row || !Number(row.active) || !Number(row.membership_active)) return null;
+  const modules = await getD1().prepare("SELECT module FROM business_modules WHERE business_id = ? AND enabled = 1 ORDER BY module")
+    .bind(String(row.business_id)).all<{ module: string }>();
   return {
     id: String(row.id),
     email: String(row.email),
@@ -116,14 +135,21 @@ export async function getAppUserBySessionToken(token: string | null, businessId 
     role: String(row.role) as AppRole,
     active: true,
     mustChangePassword: Boolean(row.must_change_password),
+    businessId: String(row.business_id),
+    businessName: String(row.business_name),
+    modules: modules.results.map((entry) => entry.module),
   };
 }
 
-export async function getAppUserFromRequest(req: Request, businessId = "krokanticas"): Promise<AppUser | null> {
-  return getAppUserBySessionToken(sessionTokenFromCookieHeader(req.headers.get("cookie")), businessId);
+export async function getAppUserFromRequest(req: Request, businessId?: string | null): Promise<AppUser | null> {
+  const cookieHeader = req.headers.get("cookie");
+  return getAppUserBySessionToken(
+    sessionTokenFromCookieHeader(cookieHeader),
+    businessId === undefined ? activeBusinessIdFromCookieHeader(cookieHeader) : businessId,
+  );
 }
 
-export async function requireAppUser(req: Request, businessId = "krokanticas", roles?: AppRole[]): Promise<AppUser> {
+export async function requireAppUser(req: Request, businessId?: string | null, roles?: AppRole[]): Promise<AppUser> {
   const user = await getAppUserFromRequest(req, businessId);
   if (!user) throw new ApiError("Sesión vencida. Volvé a iniciar sesión", 401);
   if (user.mustChangePassword) throw new ApiError("Debés actualizar tu contraseña antes de continuar", 403);
@@ -158,6 +184,11 @@ export function sessionCookie(token: string, expiresAt: number): string {
 export function clearedSessionCookie(): string {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+export function activeBusinessCookie(businessId: string): string {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${ACTIVE_BUSINESS_COOKIE}=${encodeURIComponent(businessId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 365}${secure}`;
 }
 
 export async function createResetToken(userId: string): Promise<{ token: string; expiresAt: number }> {

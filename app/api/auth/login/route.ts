@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getD1 } from "@/db";
 import { ensureSchema } from "@/db/ensure-schema";
-import { createSession, hashPassword, normalizeEmail, sessionCookie, verifyPassword } from "@/lib/server/app-auth";
+import { activeBusinessCookie, createSession, hashPassword, normalizeEmail, sessionCookie, verifyPassword } from "@/lib/server/app-auth";
 import { ApiError, apiErrorResponse } from "@/lib/server/api-utils";
 
 export async function POST(req: Request) {
@@ -11,9 +11,13 @@ export async function POST(req: Request) {
     const email = normalizeEmail(body.email);
     const password = typeof body.password === "string" ? body.password : "";
     const row = await getD1().prepare(`
-      SELECT u.id, u.email, u.name, u.password_hash, u.active, u.must_change_password, m.role, m.active AS membership_active
-      FROM app_users u JOIN memberships m ON m.user_id = u.id AND m.business_id = 'krokanticas'
+      SELECT u.id, u.email, u.name, u.password_hash, u.active, u.must_change_password, m.role,
+        m.active AS membership_active, m.business_id, b.name AS business_name
+      FROM app_users u JOIN memberships m ON m.user_id = u.id
+      JOIN businesses b ON b.id = m.business_id
       WHERE u.email = ?
+      ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, m.created_at ASC
+      LIMIT 1
     `).bind(email).first<Record<string, unknown>>();
     const passwordHash = row ? String(row.password_hash ?? "") : await hashPassword("Acceso inválido 0000");
     if (!await verifyPassword(password, passwordHash) || !row) {
@@ -27,7 +31,8 @@ export async function POST(req: Request) {
       success: true,
       user: { id: row.id, email: row.email, name: row.name, role: row.role, mustChangePassword: Boolean(row.must_change_password) },
     });
-    response.headers.set("Set-Cookie", sessionCookie(session.token, session.expiresAt));
+    response.headers.append("Set-Cookie", sessionCookie(session.token, session.expiresAt));
+    response.headers.append("Set-Cookie", activeBusinessCookie(String(row.business_id)));
     return response;
   } catch (error) {
     return apiErrorResponse(error, "Error iniciando sesión");

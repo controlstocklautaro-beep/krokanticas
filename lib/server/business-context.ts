@@ -7,6 +7,20 @@ export type BusinessRole = AppRole;
 export type BusinessContext = { businessId: string; userId: string | null; role: BusinessRole | "integration" };
 type AccessOptions = { allowIntegration?: boolean; roles?: BusinessRole[] };
 
+function moduleForPath(pathname: string): string | null {
+  if (pathname.startsWith("/api/stock")) return "stock";
+  if (pathname.startsWith("/api/kitchen")) return "kitchen";
+  if (pathname.startsWith("/api/handoffs")) return "handoffs";
+  if (pathname.startsWith("/api/contacts")) return "contacts";
+  if (pathname.startsWith("/api/users")) return "users";
+  if (pathname.startsWith("/api/settings")) return "settings";
+  if (pathname.startsWith("/api/pipeline")) return "pipeline";
+  if (pathname.startsWith("/api/finances")) return "finances";
+  if (pathname.startsWith("/api/metrics")) return "metrics";
+  if (/^\/api\/(chats|messages|tags|assign-tags|remove-tags|send-message|ingest-message|bot-status|toggle-bot|delete-chat|delete-all-chats|upload-image|upload-media|media|cleanup-expired-media)/.test(pathname)) return "messages";
+  return null;
+}
+
 function bearerToken(req: Request): string | null {
   const authorization = req.headers.get("authorization");
   if (authorization?.startsWith("Bearer ")) return authorization.slice(7).trim();
@@ -63,6 +77,17 @@ export async function requireBusinessAccess(
     business = { id: businessId, integration_key_hash: null };
   }
   if (!business) throw new ApiError("Empresa no encontrada", 404);
+
+  const requestedModule = moduleForPath(new URL(req.url).pathname);
+  if (requestedModule) {
+    const moduleState = await db.prepare(`SELECT
+      COUNT(*) AS configured,
+      SUM(CASE WHEN module = ? AND enabled = 1 THEN 1 ELSE 0 END) AS allowed
+      FROM business_modules WHERE business_id = ?`).bind(requestedModule, businessId).first<{ configured: number; allowed: number | null }>();
+    if (Number(moduleState?.configured ?? 0) > 0 && Number(moduleState?.allowed ?? 0) === 0) {
+      throw new ApiError("Este módulo no está habilitado para la empresa", 403);
+    }
+  }
 
   if (userId) {
     let membership = await db.prepare("SELECT role, active FROM memberships WHERE business_id = ? AND user_id = ?")

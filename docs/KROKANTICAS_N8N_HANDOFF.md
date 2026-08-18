@@ -76,7 +76,7 @@ Antes de activar el flujo, el responsable del negocio debe entregar:
 ### URL base
 
 ```text
-https://nexo-panel-multiempresa.emprende-dev-info.chatgpt.site
+https://panel.tudominio.com
 ```
 
 La URL debe confirmarse nuevamente cuando se publique la versión final.
@@ -110,6 +110,12 @@ También se admite `x-business-id: krokanticas`, pero es preferible enviar `busi
 ### Variables que deben configurarse al conectar producción
 
 ```env
+DATABASE_URL=<conexión PostgreSQL de Supabase; solo Vercel>
+NEXT_PUBLIC_SUPABASE_URL=<URL del proyecto Supabase>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<clave pública de Supabase>
+SUPABASE_SECRET_KEY=<clave secreta; solo Vercel>
+SUPABASE_STORAGE_BUCKET=conversation-media
+APP_BASE_URL=https://panel.tudominio.com
 BUSINESS_INTEGRATION_KEY=<clave larga y aleatoria compartida con n8n>
 N8N_WEBHOOK_URL=<webhook de producción que envía mensajes por WhatsApp>
 MEDIA_CLEANUP_SECRET=<clave distinta para la limpieza programada de multimedia>

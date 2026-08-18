@@ -27,6 +27,7 @@ export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
+  const [setupToken, setSetupToken] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -46,7 +47,7 @@ export function LoginForm() {
       await authApi(setup ? "/api/auth/setup" : "/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(setup ? { name, email, password } : { email, password }),
+        body: JSON.stringify(setup ? { name, email, password, setupToken } : { email, password }),
       });
       window.location.replace("/");
     } catch (submitError) {
@@ -62,6 +63,7 @@ export function LoginForm() {
     <div className="auth-title"><span>{setup ? "PRIMER ACCESO" : "ACCESO AL PANEL"}</span><h1>{setup ? "Crear administrador" : "Bienvenido"}</h1><p>{setup ? "Configurá el primer usuario propietario de Krokanticas." : "Ingresá con tu correo y contraseña."}</p></div>
     {setupBlocked && <div className="auth-alert">El administrador inicial debe crearse desde el acceso privado autorizado.</div>}
     {setup && <label className="auth-field"><span>Nombre del responsable</span><input required minLength={2} maxLength={100} value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" placeholder="Ej. Ana Krokanticas" /></label>}
+    {setup && <label className="auth-field"><span>Clave de configuración inicial</span><input required type="password" value={setupToken} onChange={(event) => setSetupToken(event.target.value)} autoComplete="off" placeholder="Clave configurada en Vercel" /></label>}
     <label className="auth-field"><span>Correo electrónico</span><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="nombre@krokanticas.com" /></label>
     <PasswordField value={password} onChange={setPassword} autoComplete={setup ? "new-password" : "current-password"} />
     {setup && <PasswordField value={confirmation} onChange={setConfirmation} autoComplete="new-password" label="Repetir contraseña" />}

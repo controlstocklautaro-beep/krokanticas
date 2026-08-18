@@ -5,10 +5,9 @@ import { CustomersModule, MessagesModule } from "./components/OperationalModules
 import { PwaInstall } from "./components/PwaInstall";
 import { UsersModule } from "./components/UsersModule";
 
-const BUSINESS_ID = "krokanticas";
-
 type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "users";
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
+type Business = { id: string; name: string; modules: string[] };
 type Product = { id: string; name: string; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null };
 type Contact = { id: string; name: string; phone_number: string; address?: string | null };
 type OrderItem = { id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number };
@@ -41,37 +40,60 @@ function money(value: number) {
   return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(value);
 }
 
-export function KrokanticasPanel({ user }: { user: { id: string; displayName: string; email: string; role: UserRole } }) {
+function BusinessSwitcher({ activeBusiness }: { activeBusiness: Business }) {
+  const [businesses, setBusinesses] = useState<Business[]>([activeBusiness]);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api<{ businesses: Business[] }>("/api/businesses").then((data) => setBusinesses(data.businesses)).catch(() => undefined);
+  }, []);
+  async function change(businessId: string) {
+    if (businessId === activeBusiness.id) return;
+    setBusy(true);
+    try {
+      await api("/api/businesses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId }) });
+      window.location.reload();
+    } finally { setBusy(false); }
+  }
+  if (businesses.length < 2) return null;
+  return <label className="k-business-switcher"><span>EMPRESA</span><select value={activeBusiness.id} disabled={busy} onChange={(event) => void change(event.target.value)}>{businesses.map((business) => <option value={business.id} key={business.id}>{business.name}</option>)}</select></label>;
+}
+
+export function KrokanticasPanel({ user, business }: { user: { id: string; displayName: string; email: string; role: UserRole }; business: Business }) {
   const [active, setActive] = useState<Section>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const name = user.displayName.includes("@") ? "Equipo Krokanticas" : user.displayName;
-  const visibleSections = sections.filter((section) => section.id !== "users" || ["owner", "admin"].includes(user.role));
+  const name = user.displayName.includes("@") ? `Equipo ${business.name}` : user.displayName;
+  const visibleSections = sections.filter((section) => {
+    if (section.id === "overview") return true;
+    if (section.id === "users" && !["owner", "admin"].includes(user.role)) return false;
+    return business.modules.length === 0 || business.modules.includes(section.id);
+  });
   const choose = (section: Section) => { setActive(section); setMobileOpen(false); };
 
   return <div className="k-app">
     {mobileOpen && <button className="k-overlay" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />}
     <aside className={`k-sidebar ${mobileOpen ? "open" : ""}`}>
-      <div className="k-brand"><span className="k-brand-mark">K</span><div><strong>KROKANTICAS</strong><small>Central de pedidos</small></div></div>
+      <div className="k-brand"><span className="k-brand-mark">{business.name.slice(0, 1).toUpperCase()}</span><div><strong>{business.name.toUpperCase()}</strong><small>Panel operativo</small></div></div>
+      <BusinessSwitcher activeBusiness={business} />
       <div className="k-wa pending"><i /> WhatsApp pendiente <span>POR INTEGRAR</span></div>
-      <nav aria-label="Navegación Krokanticas">{["OPERACIÓN", "ATENCIÓN", "CONFIGURACIÓN"].map((group) => visibleSections.some((section) => section.group === group) && <div className="k-nav-group" key={group}><p>{group}</p>{visibleSections.filter((section) => section.group === group).map((section) => <button key={section.id} className={active === section.id ? "active" : ""} onClick={() => choose(section.id)}><span>{section.icon}</span>{section.label}{["kitchen", "handoffs"].includes(section.id) && <b>●</b>}</button>)}</div>)}</nav>
+      <nav aria-label={`Navegación ${business.name}`}>{["OPERACIÓN", "ATENCIÓN", "CONFIGURACIÓN"].map((group) => visibleSections.some((section) => section.group === group) && <div className="k-nav-group" key={group}><p>{group}</p>{visibleSections.filter((section) => section.group === group).map((section) => <button key={section.id} className={active === section.id ? "active" : ""} onClick={() => choose(section.id)}><span>{section.icon}</span>{section.label}{["kitchen", "handoffs"].includes(section.id) && <b>●</b>}</button>)}</div>)}</nav>
       <div className="k-sidebar-bottom"><div className="k-help"><strong>¿Necesitás intervenir?</strong><small>Usá Derivaciones para tomar reclamos o casos ambiguos.</small></div><div className="k-profile"><span>{name.slice(0, 2).toUpperCase()}</span><div><strong>{name}</strong><small>{user.email}</small></div><a href="/api/auth/logout">Salir</a></div></div>
     </aside>
     <main className="k-main">
-      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">☰</button><div><span>Krokanticas</span><b>/</b><strong>{visibleSections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><PwaInstall /><span className="k-live">● Panel operativo</span></div></header>
+      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú">☰</button><div><span>{business.name}</span><b>/</b><strong>{visibleSections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><PwaInstall /><span className="k-live">● Panel operativo</span></div></header>
       <section className="k-content">
-        {active === "overview" && <Overview onNavigate={choose} />}
-        {active === "kitchen" && <KitchenModule />}
-        {active === "stock" && <StockModule />}
-        {active === "messages" && <div className="k-module"><MessagesModule businessId={BUSINESS_ID} /></div>}
-        {active === "handoffs" && <HandoffsModule />}
-        {active === "contacts" && <div className="k-module"><CustomersModule businessId={BUSINESS_ID} /></div>}
-        {active === "users" && ["owner", "admin"].includes(user.role) && <UsersModule currentUser={{ id: user.id, email: user.email, role: user.role }} />}
+        {active === "overview" && <Overview businessId={business.id} onNavigate={choose} />}
+        {active === "kitchen" && <KitchenModule businessId={business.id} />}
+        {active === "stock" && <StockModule businessId={business.id} />}
+        {active === "messages" && <div className="k-module"><MessagesModule businessId={business.id} /></div>}
+        {active === "handoffs" && <HandoffsModule businessId={business.id} />}
+        {active === "contacts" && <div className="k-module"><CustomersModule businessId={business.id} /></div>}
+        {active === "users" && ["owner", "admin"].includes(user.role) && <UsersModule businessId={business.id} currentUser={{ id: user.id, email: user.email, role: user.role }} />}
       </section>
     </main>
   </div>;
 }
 
-function Overview({ onNavigate }: { onNavigate: (section: Section) => void }) {
+function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: (section: Section) => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -81,30 +103,30 @@ function Overview({ onNavigate }: { onNavigate: (section: Section) => void }) {
 
   async function reload() {
     const [settingsData, orderData, productData, contactData, handoffData] = await Promise.all([
-      api<{ settings: Settings }>(`/api/settings?businessId=${BUSINESS_ID}`),
-      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${BUSINESS_ID}`),
-      api<{ products: Product[] }>(`/api/stock?businessId=${BUSINESS_ID}`),
-      api<{ contacts: Contact[] }>(`/api/contacts?businessId=${BUSINESS_ID}`),
-      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${BUSINESS_ID}`),
+      api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`),
+      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+      api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
+      api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
+      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`),
     ]);
     setSettings(settingsData.settings); setOrders(orderData.orders); setProducts(productData.products); setContacts(contactData.contacts); setHandoffs(handoffData.handoffs);
   }
 
   useEffect(() => {
     void Promise.all([
-      api<{ settings: Settings }>(`/api/settings?businessId=${BUSINESS_ID}`),
-      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${BUSINESS_ID}`),
-      api<{ products: Product[] }>(`/api/stock?businessId=${BUSINESS_ID}`),
-      api<{ contacts: Contact[] }>(`/api/contacts?businessId=${BUSINESS_ID}`),
-      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${BUSINESS_ID}`),
+      api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`),
+      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+      api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
+      api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
+      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`),
     ]).then(([settingsData, orderData, productData, contactData, handoffData]) => {
       setSettings(settingsData.settings); setOrders(orderData.orders); setProducts(productData.products); setContacts(contactData.contacts); setHandoffs(handoffData.handoffs);
     }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
-  }, []);
+  }, [businessId]);
 
   async function updateSettings(change: Partial<{ storeOpen: boolean; delayMinutes: number; courierActive: boolean }>) {
     try {
-      await api("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, ...change }) });
+      await api("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, ...change }) });
       await reload();
     } catch (updateError) { setError(updateError instanceof Error ? updateError.message : "No se pudo actualizar"); }
   }
@@ -126,20 +148,20 @@ function Overview({ onNavigate }: { onNavigate: (section: Section) => void }) {
   </div>;
 }
 
-function StockModule() {
+function StockModule({ businessId }: { businessId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
   const [error, setError] = useState("");
-  async function reload() { const data = await api<{ products: Product[] }>(`/api/stock?businessId=${BUSINESS_ID}`); setProducts(data.products); }
-  useEffect(() => { void api<{ products: Product[] }>(`/api/stock?businessId=${BUSINESS_ID}`).then((data) => setProducts(data.products)).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, []);
-  async function adjust(product: Product, delta: number) { try { await api("/api/stock/adjust", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, productId: product.id, delta }) }); await reload(); } catch (adjustError) { setError(adjustError instanceof Error ? adjustError.message : "No se pudo ajustar"); } }
-  async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!editing) return; const form = new FormData(event.currentTarget); const status = String(form.get("status")); try { await api("/api/stock", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, id: editing.id, name: form.get("name"), price: Number(form.get("price")), aliases: String(form.get("aliases") || "").split(","), stockStatus: status, stockQuantity: status === "limited" ? Number(form.get("quantity")) : null, active: true }) }); setEditing(null); await reload(); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "No se pudo guardar"); } }
+  async function reload() { const data = await api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`); setProducts(data.products); }
+  useEffect(() => { void api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`).then((data) => setProducts(data.products)).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, [businessId]);
+  async function adjust(product: Product, delta: number) { try { await api("/api/stock/adjust", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, productId: product.id, delta }) }); await reload(); } catch (adjustError) { setError(adjustError instanceof Error ? adjustError.message : "No se pudo ajustar"); } }
+  async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!editing) return; const form = new FormData(event.currentTarget); const status = String(form.get("status")); try { await api("/api/stock", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: editing.id, name: form.get("name"), price: Number(form.get("price")), aliases: String(form.get("aliases") || "").split(","), stockStatus: status, stockQuantity: status === "limited" ? Number(form.get("quantity")) : null, active: true }) }); setEditing(null); await reload(); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "No se pudo guardar"); } }
   const filtered = products.filter((product) => product.name.toLowerCase().includes(search.toLowerCase()));
   return <div className="k-module"><div className="k-heading"><div><span className="k-eyebrow">{products.length} VARIEDADES</span><h1>Stock del día</h1><p>Solo cargá una cantidad exacta cuando queden pocas unidades.</p></div><label className="k-search">⌕<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar variedad" /></label></div>{error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}<div className="k-stock-grid">{filtered.map((product) => <article className={`k-stock-card ${product.stock_status}`} key={product.id}><div className="k-stock-top"><span className="k-food-icon">◒</span><b className="k-stock-state">{product.stock_status === "available" ? "DISPONIBLE" : product.stock_status === "limited" ? "POCO STOCK" : "AGOTADA"}</b></div><h2>{product.name}</h2><p>{money(product.price)} por unidad</p><div className="k-stock-bottom">{product.stock_status === "limited" ? <div className="k-stepper"><button onClick={() => adjust(product, -1)}>−</button><strong>{product.stock_quantity}</strong><button onClick={() => adjust(product, 1)}>＋</button></div> : <small>{product.stock_status === "available" ? "Sin cantidad limitada" : "No aceptar pedidos"}</small>}<button className="k-edit" onClick={() => setEditing(product)}>Editar</button></div></article>)}</div>{editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><form className="modal k-modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="k-eyebrow">VARIEDAD</span><h2>Editar stock</h2></div><button type="button" onClick={() => setEditing(null)}>×</button></div><label>Nombre<input name="name" defaultValue={editing.name} required /></label><div className="form-grid"><label>Precio<input name="price" type="number" min="0" defaultValue={editing.price} /></label><label>Estado<select name="status" defaultValue={editing.stock_status}><option value="available">Disponible</option><option value="limited">Poco stock</option><option value="soldout">Agotada</option></select></label></div><label>Cantidad restante<input name="quantity" type="number" min="0" defaultValue={editing.stock_quantity ?? 0} /></label><label>Sinónimos separados por coma<textarea name="aliases" defaultValue={editing.aliases.join(", ")} /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button><button className="k-primary">Guardar cambios</button></div></form></div>}</div>;
 }
 
-function HandoffsModule() {
+function HandoffsModule({ businessId }: { businessId: string }) {
   const [handoffs, setHandoffs] = useState<Handoff[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [filter, setFilter] = useState<"active" | Handoff["status"] | "all">("active");
@@ -147,10 +169,10 @@ function HandoffsModule() {
   const [error, setError] = useState("");
 
   async function reload() {
-    const [handoffData, contactData] = await Promise.all([api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${BUSINESS_ID}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${BUSINESS_ID}`)]);
+    const [handoffData, contactData] = await Promise.all([api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`)]);
     setHandoffs(handoffData.handoffs); setContacts(contactData.contacts);
   }
-  useEffect(() => { void Promise.all([api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${BUSINESS_ID}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${BUSINESS_ID}`)]).then(([handoffData, contactData]) => { setHandoffs(handoffData.handoffs); setContacts(contactData.contacts); }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, []);
+  useEffect(() => { void Promise.all([api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`)]).then(([handoffData, contactData]) => { setHandoffs(handoffData.handoffs); setContacts(contactData.contacts); }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, [businessId]);
   const visible = handoffs.filter((handoff) => filter === "all" || filter === "active" && handoff.status !== "resolved" || handoff.status === filter);
   const reasonLabel: Record<Handoff["reason"], string> = { complaint: "Reclamo", ambiguity: "Caso ambiguo", human_request: "Pidió atención humana", post_confirmation_change: "Cambio luego de confirmar", other: "Otro" };
   const priorityLabel: Record<Handoff["priority"], string> = { low: "Baja", medium: "Media", high: "Alta" };
@@ -158,19 +180,19 @@ function HandoffsModule() {
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const contactId = String(form.get("contactId") || ""); const contact = contacts.find((item) => item.id === contactId);
     try {
-      await api("/api/handoffs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, contactId: contactId || undefined, customerName: contact?.name || form.get("customerName"), phoneNumber: contact?.phone_number || form.get("phoneNumber"), reason: form.get("reason"), priority: form.get("priority"), summary: form.get("summary") }) });
+      await api("/api/handoffs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, contactId: contactId || undefined, customerName: contact?.name || form.get("customerName"), phoneNumber: contact?.phone_number || form.get("phoneNumber"), reason: form.get("reason"), priority: form.get("priority"), summary: form.get("summary") }) });
       setCreating(false); await reload();
     } catch (createError) { setError(createError instanceof Error ? createError.message : "No se pudo crear"); }
   }
 
   async function update(handoff: Handoff, change: Partial<Pick<Handoff, "status" | "priority">> & { assignedTo?: string }) {
-    try { await api("/api/handoffs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, id: handoff.id, ...change }) }); await reload(); }
+    try { await api("/api/handoffs", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: handoff.id, ...change }) }); await reload(); }
     catch (updateError) { setError(updateError instanceof Error ? updateError.message : "No se pudo actualizar"); }
   }
 
   async function remove(handoff: Handoff) {
     if (!window.confirm(`¿Eliminar la derivación de ${handoff.customer_name}?`)) return;
-    try { await api("/api/handoffs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, id: handoff.id }) }); await reload(); }
+    try { await api("/api/handoffs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: handoff.id }) }); await reload(); }
     catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar"); }
   }
 
@@ -187,7 +209,7 @@ function ProductPicker({ products, items, onChange, includeSoldout = false }: { 
   return <fieldset className="k-product-picker"><legend>Productos</legend>{products.filter((product) => includeSoldout || product.stock_status !== "soldout").map((product) => { const quantity = items[product.id] || 0; return <div className={product.stock_status === "soldout" ? "soldout" : ""} key={product.id}><span><strong>{product.name}</strong><small>{money(product.price)}{product.stock_status === "limited" ? ` · quedan ${product.stock_quantity}` : product.stock_status === "soldout" ? " · agotada" : ""}</small></span><div className="k-stepper"><button type="button" onClick={() => onChange({ ...items, [product.id]: Math.max(0, quantity - 1) })}>−</button><b>{quantity}</b><button type="button" disabled={product.stock_status === "soldout" && quantity === 0} onClick={() => onChange({ ...items, [product.id]: quantity + 1 })}>＋</button></div></div>; })}</fieldset>;
 }
 
-function KitchenModule() {
+function KitchenModule({ businessId }: { businessId: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -200,26 +222,26 @@ function KitchenModule() {
   const [error, setError] = useState("");
 
   async function reload() {
-    const [orderData, contactData, productData] = await Promise.all([api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${BUSINESS_ID}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${BUSINESS_ID}`), api<{ products: Product[] }>(`/api/stock?businessId=${BUSINESS_ID}`)]);
+    const [orderData, contactData, productData] = await Promise.all([api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`), api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`)]);
     setOrders(orderData.orders); setContacts(contactData.contacts); setProducts(productData.products.filter((product) => product.active));
   }
-  useEffect(() => { void Promise.all([api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${BUSINESS_ID}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${BUSINESS_ID}`), api<{ products: Product[] }>(`/api/stock?businessId=${BUSINESS_ID}`)]).then(([orderData, contactData, productData]) => { setOrders(orderData.orders); setContacts(contactData.contacts); setProducts(productData.products.filter((product) => product.active)); }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, []);
+  useEffect(() => { void Promise.all([api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`), api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`)]).then(([orderData, contactData, productData]) => { setOrders(orderData.orders); setContacts(contactData.contacts); setProducts(productData.products.filter((product) => product.active)); }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, [businessId]);
   const visible = useMemo(() => { const term = search.trim().toLowerCase(); return orders.filter((order) => (filter === "all" || filter === "active" && !["delivered", "cancelled"].includes(order.status) || order.status === filter) && (!term || order.customer_name.toLowerCase().includes(term) || order.phone_number.includes(term) || String(order.order_number).includes(term))); }, [orders, filter, search]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const items = Object.entries(draftItems).filter(([, quantity]) => quantity > 0).map(([productId, quantity]) => ({ productId, quantity }));
-    try { await api("/api/kitchen/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, contactId: form.get("contactId"), deliveryType: form.get("deliveryType"), address: form.get("address"), zone: form.get("zone"), paymentMethod: form.get("paymentMethod"), scheduledTime: form.get("scheduledTime"), shippingCost: Number(form.get("shippingCost")), notes: form.get("notes"), items }) }); setCreating(false); setDraftItems({}); await reload(); }
+    try { await api("/api/kitchen/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, contactId: form.get("contactId"), deliveryType: form.get("deliveryType"), address: form.get("address"), zone: form.get("zone"), paymentMethod: form.get("paymentMethod"), scheduledTime: form.get("scheduledTime"), shippingCost: Number(form.get("shippingCost")), notes: form.get("notes"), items }) }); setCreating(false); setDraftItems({}); await reload(); }
     catch (createError) { setError(createError instanceof Error ? createError.message : "No se pudo crear"); }
   }
 
-  async function setStatus(order: Order, status: Order["status"]) { try { await api("/api/kitchen/edit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, id: order.id, status }) }); await reload(); } catch (statusError) { setError(statusError instanceof Error ? statusError.message : "No se pudo actualizar"); } }
+  async function setStatus(order: Order, status: Order["status"]) { try { await api("/api/kitchen/edit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: order.id, status }) }); await reload(); } catch (statusError) { setError(statusError instanceof Error ? statusError.message : "No se pudo actualizar"); } }
   function openEdit(order: Order) { setEditing(order); setEditItems(Object.fromEntries(order.items.map((item) => [item.product_id, item.quantity]))); }
   async function saveEdit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!editing) return; const form = new FormData(event.currentTarget); const items = Object.entries(editItems).filter(([, quantity]) => quantity > 0).map(([productId, quantity]) => ({ productId, quantity }));
-    try { await api("/api/kitchen/edit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, id: editing.id, deliveryType: form.get("deliveryType"), address: form.get("address"), zone: form.get("zone"), paymentMethod: form.get("paymentMethod"), scheduledTime: form.get("scheduledTime"), shippingCost: Number(form.get("shippingCost")), notes: form.get("notes"), items }) }); setEditing(null); setEditItems({}); await reload(); }
+    try { await api("/api/kitchen/edit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: editing.id, deliveryType: form.get("deliveryType"), address: form.get("address"), zone: form.get("zone"), paymentMethod: form.get("paymentMethod"), scheduledTime: form.get("scheduledTime"), shippingCost: Number(form.get("shippingCost")), notes: form.get("notes"), items }) }); setEditing(null); setEditItems({}); await reload(); }
     catch (saveError) { setError(saveError instanceof Error ? saveError.message : "No se pudo guardar"); }
   }
-  async function remove(order: Order) { if (!window.confirm(`¿Eliminar la comanda #${order.order_number}? El stock limitado se devolverá.`)) return; try { await api("/api/kitchen/delete", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId: BUSINESS_ID, id: order.id }) }); await reload(); } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar"); } }
+  async function remove(order: Order) { if (!window.confirm(`¿Eliminar la comanda #${order.order_number}? El stock limitado se devolverá.`)) return; try { await api("/api/kitchen/delete", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: order.id }) }); await reload(); } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar"); } }
   const statusLabel: Record<Order["status"], string> = { confirmed: "Confirmado", in_kitchen: "En cocina", ready: "Listo", delivered: "Entregado", cancelled: "Cancelado" };
 
   return <div className="k-module">

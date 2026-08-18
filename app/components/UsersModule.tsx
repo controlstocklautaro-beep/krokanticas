@@ -28,32 +28,32 @@ function initials(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
-export function UsersModule({ currentUser }: { currentUser: { id?: string; email: string; role: Role } }) {
+export function UsersModule({ businessId, currentUser }: { businessId: string; currentUser: { id?: string; email: string; role: Role } }) {
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [editing, setEditing] = useState<"new" | UserRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function load() {
-    const data = await usersApi<{ users: UserRecord[] }>("/api/users?businessId=krokanticas");
+    const data = await usersApi<{ users: UserRecord[] }>(`/api/users?businessId=${encodeURIComponent(businessId)}`);
     setUsers(data.users);
   }
 
   useEffect(() => {
     let active = true;
-    void usersApi<{ users: UserRecord[] }>("/api/users?businessId=krokanticas").then((data) => {
+    void usersApi<{ users: UserRecord[] }>(`/api/users?businessId=${encodeURIComponent(businessId)}`).then((data) => {
       if (active) setUsers(data.users);
     }).catch((loadError) => {
       if (active) setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los usuarios");
     });
     return () => { active = false; };
-  }, []);
+  }, [businessId]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
     const form = new FormData(event.currentTarget);
     const payload = {
-      businessId: "krokanticas",
+      businessId,
       id: editing === "new" ? undefined : editing?.id,
       name: String(form.get("name") || ""),
       email: editing === "new" ? String(form.get("email") || "") : undefined,

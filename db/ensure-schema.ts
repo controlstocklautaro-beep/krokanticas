@@ -4,19 +4,23 @@ let schemaReady: Promise<void> | null = null;
 
 const statements = [
   `CREATE TABLE IF NOT EXISTS businesses (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, business_type TEXT NOT NULL DEFAULT 'restaurant', plan TEXT NOT NULL DEFAULT 'base', n8n_webhook_url TEXT, integration_key_hash TEXT, created_at INTEGER NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS memberships (business_id TEXT NOT NULL, user_id TEXT NOT NULL, email TEXT, role TEXT NOT NULL DEFAULT 'staff', active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, PRIMARY KEY (business_id, user_id))`,
+  `CREATE TABLE IF NOT EXISTS memberships (business_id TEXT NOT NULL, user_id TEXT NOT NULL, email TEXT, role TEXT NOT NULL DEFAULT 'staff', active BIGINT NOT NULL DEFAULT 1, created_at BIGINT NOT NULL, PRIMARY KEY (business_id, user_id))`,
   `CREATE INDEX IF NOT EXISTS memberships_user_idx ON memberships (user_id)`,
-  `CREATE TABLE IF NOT EXISTS app_users (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, name TEXT NOT NULL, password_hash TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, must_change_password INTEGER NOT NULL DEFAULT 0, last_login_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS business_modules (business_id TEXT NOT NULL, module TEXT NOT NULL, enabled BIGINT NOT NULL DEFAULT 1, updated_at BIGINT NOT NULL, PRIMARY KEY (business_id, module))`,
+  `CREATE INDEX IF NOT EXISTS business_modules_business_idx ON business_modules (business_id)`,
+  `CREATE TABLE IF NOT EXISTS business_integrations (business_id TEXT NOT NULL, provider TEXT NOT NULL, enabled BIGINT NOT NULL DEFAULT 0, configuration TEXT NOT NULL DEFAULT '{}', updated_at BIGINT NOT NULL, PRIMARY KEY (business_id, provider))`,
+  `CREATE INDEX IF NOT EXISTS business_integrations_business_idx ON business_integrations (business_id)`,
+  `CREATE TABLE IF NOT EXISTS app_users (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, name TEXT NOT NULL, password_hash TEXT NOT NULL, active BIGINT NOT NULL DEFAULT 1, must_change_password BIGINT NOT NULL DEFAULT 0, last_login_at BIGINT, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS app_users_email_uq ON app_users (email)`,
-  `CREATE TABLE IF NOT EXISTS app_sessions (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, token_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS app_sessions (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, token_hash TEXT NOT NULL, expires_at BIGINT NOT NULL, created_at BIGINT NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS app_sessions_token_uq ON app_sessions (token_hash)`,
   `CREATE INDEX IF NOT EXISTS app_sessions_user_idx ON app_sessions (user_id)`,
   `CREATE INDEX IF NOT EXISTS app_sessions_expiry_idx ON app_sessions (expires_at)`,
-  `CREATE TABLE IF NOT EXISTS password_reset_tokens (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, token_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER, created_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS password_reset_tokens (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, token_hash TEXT NOT NULL, expires_at BIGINT NOT NULL, used_at BIGINT, created_at BIGINT NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS password_reset_tokens_hash_uq ON password_reset_tokens (token_hash)`,
   `CREATE INDEX IF NOT EXISTS password_reset_tokens_user_idx ON password_reset_tokens (user_id)`,
   `CREATE INDEX IF NOT EXISTS password_reset_tokens_expiry_idx ON password_reset_tokens (expires_at)`,
-  `CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, name TEXT NOT NULL, email TEXT, notes TEXT, agent_active INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, name TEXT NOT NULL, email TEXT, address TEXT, notes TEXT, agent_active BIGINT NOT NULL DEFAULT 1, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS contacts_business_phone_uq ON contacts (business_id, phone_number)`,
   `CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, user_name TEXT NOT NULL, agent_active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS chats_business_phone_uq ON chats (business_id, phone_number)`,
@@ -54,12 +58,10 @@ const statements = [
 export function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     const db = getD1();
-    schemaReady = db.batch(statements.map((sql) => db.prepare(sql))).then(async () => {
-      const columns = await db.prepare("PRAGMA table_info('contacts')").all<{ name: string }>();
-      if (!columns.results.some((column) => column.name === "address")) {
-        await db.prepare("ALTER TABLE contacts ADD COLUMN address TEXT").run();
-      }
-    });
+    schemaReady = db.batch([
+      ...statements.map((sql) => db.prepare(sql.replaceAll(" INTEGER", " BIGINT"))),
+      db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS address TEXT"),
+    ]).then(() => undefined);
   }
   return schemaReady;
 }

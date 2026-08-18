@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getD1, getMediaBucket } from "@/db";
+import { getD1, getMediaBucket, type PreparedStatement } from "@/db";
 import { apiErrorResponse, businessIdFrom } from "@/lib/server/api-utils";
 import { requireBusinessAccess } from "@/lib/server/business-context";
 
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     const bucket = getMediaBucket();
     let cleaned = 0;
     let missingFiles = 0;
-    const updates: D1PreparedStatement[] = [];
+    const updates: PreparedStatement[] = [];
     for (const record of records.results) {
       const existing = await bucket.head(record.storage_path);
       if (existing) {
