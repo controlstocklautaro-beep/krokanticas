@@ -33,10 +33,23 @@ export function noStoreJson(body: unknown, init: ResponseInit = {}) {
   return NextResponse.json(body, { ...init, headers });
 }
 
+export function isApiError(error: unknown): error is ApiError {
+  if (error instanceof ApiError) return true;
+  return Boolean(
+    error &&
+      typeof error === "object" &&
+      "status" in error &&
+      typeof (error as { status?: unknown }).status === "number" &&
+      "message" in error,
+  );
+}
+
 export function apiErrorResponse(error: unknown, label: string) {
-  if (error instanceof ApiError) return NextResponse.json({ error: error.message }, { status: error.status });
+  if (isApiError(error)) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
   console.error(label, error);
-  return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  return NextResponse.json({ error: error instanceof Error ? error.message : "Error interno" }, { status: 500 });
 }
 
 export function stringArray(value: unknown, fieldName: string): string[] {
