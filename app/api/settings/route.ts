@@ -25,7 +25,7 @@ export async function PATCH(req: Request) {
     const delay = body.delayMinutes === undefined ? null : Number(body.delayMinutes);
     if (delay !== null && ![15, 30, 45].includes(delay)) throw new ApiError("La demora debe ser 15, 30 o 45", 400);
     const db = getD1(); const now = Date.now();
-    await db.prepare(`INSERT INTO business_settings (business_id, store_open, delay_minutes, courier_active, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(business_id) DO UPDATE SET store_open = COALESCE(?, store_open), delay_minutes = COALESCE(?, delay_minutes), courier_active = COALESCE(?, courier_active), updated_at = ?`)
+    await db.prepare(`INSERT INTO business_settings (business_id, store_open, delay_minutes, courier_active, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(business_id) DO UPDATE SET store_open = COALESCE(?, business_settings.store_open), delay_minutes = COALESCE(?, business_settings.delay_minutes), courier_active = COALESCE(?, business_settings.courier_active), updated_at = ?`)
       .bind(businessId, body.storeOpen === false ? 0 : 1, delay ?? 30, body.courierActive === false ? 0 : 1, now, body.storeOpen === undefined ? null : body.storeOpen ? 1 : 0, delay, body.courierActive === undefined ? null : body.courierActive ? 1 : 0, now).run();
     return NextResponse.json({ success: true });
   } catch (error) { return apiErrorResponse(error, "Error actualizando configuración"); }
