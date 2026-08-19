@@ -11,7 +11,7 @@ type QueryExecutor = {
 };
 
 function databaseUrl(): string {
-  const value = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  const value = (process.env.DATABASE_URL ?? process.env.POSTGRES_URL)?.trim().replace(/^["']|["']$/g, "");
   if (!value) throw new Error("Falta DATABASE_URL. Conectá el proyecto de Supabase antes de usar la API.");
   return value;
 }
