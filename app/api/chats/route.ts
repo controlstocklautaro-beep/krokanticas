@@ -6,13 +6,13 @@ import { requireBusinessAccess } from "@/lib/server/business-context";
 export async function GET(req: Request) {
   try {
     const businessId = businessIdFrom(req);
-    await requireBusinessAccess(req, businessId);
+    await requireBusinessAccess(req, businessId, { allowIntegration: true });
     const result = await getD1().prepare(`
       SELECT c.phone_number, c.user_name, c.agent_active, c.updated_at,
-        COALESCE(GROUP_CONCAT(t.tag, '||'), '') AS tags,
+        COALESCE(string_agg(t.tag, '||'), '') AS tags,
         (SELECT m.message FROM messages m WHERE m.business_id = c.business_id AND m.phone_number = c.phone_number ORDER BY m.created_at DESC LIMIT 1) AS last_message
       FROM chats c LEFT JOIN chat_tags t ON t.business_id = c.business_id AND t.phone_number = c.phone_number
-      WHERE c.business_id = ? GROUP BY c.id ORDER BY c.updated_at DESC
+      WHERE c.business_id = ? GROUP BY c.id, c.phone_number, c.user_name, c.agent_active, c.updated_at, c.business_id ORDER BY c.updated_at DESC
     `).bind(businessId).all<Record<string, unknown>>();
     const chats = result.results.map((chat) => ({
       ...chat,

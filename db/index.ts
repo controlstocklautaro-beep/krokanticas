@@ -61,6 +61,10 @@ function postgresSql(source: string): string {
     .replace(/^INSERT\s+OR\s+IGNORE\s+INTO/i, "INSERT INTO")
     .replace(/^UPDATE\s+OR\s+IGNORE\s+/i, "UPDATE ")
     .replace(
+      /GROUP_CONCAT\s*\(\s*([^,]+)\s*,\s*([^)]+)\s*\)/gi,
+      "string_agg($1, $2)",
+    )
+    .replace(
       /strftime\('%Y-%m',\s*created_at\s*\/\s*1000,\s*'unixepoch'\)/gi,
       "to_char(to_timestamp(created_at / 1000.0), 'YYYY-MM')",
     );
