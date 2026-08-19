@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const businessId = businessIdFrom(req);
     await requireBusinessAccess(req, businessId, { allowIntegration: true });
     await seedCatalog(businessId);
-    const result = await getD1().prepare("SELECT id, name, price, aliases, active, stock_status, stock_quantity, updated_at FROM products WHERE business_id = ? ORDER BY name ASC").bind(businessId).all();
+    const result = await getD1().prepare("SELECT id, name, price, aliases, active, stock_status, stock_quantity, updated_at FROM products WHERE business_id = ? AND active = 1 ORDER BY name ASC").bind(businessId).all();
     return NextResponse.json({ products: result.results.map((row) => ({ ...row, aliases: JSON.parse(String(row.aliases || "[]")) })) });
   } catch (error) { return apiErrorResponse(error, "Error consultando stock"); }
 }
@@ -64,8 +64,8 @@ export async function POST(req: Request) {
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager"] });
     const product = normalized(body);
     const id = crypto.randomUUID(); const now = Date.now();
-    await getD1().prepare("INSERT INTO products (id, business_id, name, price, aliases, active, stock_status, stock_quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, businessId, product.name, product.price, product.aliases, body.active === false ? 0 : 1, product.status, product.quantity, now, now).run();
+    await getD1().prepare("INSERT INTO products (id, business_id, name, price, aliases, active, stock_status, stock_quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)")
+      .bind(id, businessId, product.name, product.price, product.aliases, product.status, product.quantity, now, now).run();
     return NextResponse.json({ success: true, id }, { status: 201 });
   } catch (error) { return apiErrorResponse(error, "Error creando variedad"); }
 }
@@ -89,9 +89,9 @@ export async function DELETE(req: Request) {
   try {
     const body = await req.json() as ProductBody;
     const businessId = businessIdFrom(req, body.businessId);
-    await requireBusinessAccess(req, businessId, { roles: ["owner", "admin"] });
+    await requireBusinessAccess(req, businessId, { roles: ["owner", "admin", "manager"] });
     if (!body.id) throw new ApiError("Falta id", 400);
-    await getD1().prepare("UPDATE products SET active = 0, updated_at = ? WHERE id = ? AND business_id = ?").bind(Date.now(), body.id, businessId).run();
+    await getD1().prepare("DELETE FROM products WHERE id = ? AND business_id = ?").bind(body.id, businessId).run();
     return NextResponse.json({ success: true });
-  } catch (error) { return apiErrorResponse(error, "Error desactivando variedad"); }
+  } catch (error) { return apiErrorResponse(error, "Error eliminando variedad"); }
 }

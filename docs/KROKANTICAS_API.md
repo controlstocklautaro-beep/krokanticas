@@ -106,21 +106,74 @@ Motivos admitidos: `complaint`, `ambiguity`, `human_request`, `post_confirmation
 }
 ```
 
-## Configuración del turno
+## Configuración operativa, horarios, pagos y envíos
 
 - `GET /api/settings?businessId=krokanticas`
 - `PATCH /api/settings`
+
+### Respuesta de `GET /api/settings`:
+
+```json
+{
+  "settings": {
+    "store_open": 1,
+    "delay_minutes": 30,
+    "courier_active": 1,
+    "address": "Ruta 21 y calle Arroyo Seco. Empalme Villa Constitución.",
+    "active_alias": 1,
+    "alias_1": {
+      "alias": "Krokanticas2021",
+      "bank": "Mercado Pago",
+      "holder": "Matias Montes",
+      "active": true
+    },
+    "alias_2": {
+      "alias": "Krokan2021",
+      "bank": "Mercado Pago",
+      "holder": "Fabian Gonzalo Montes",
+      "active": false
+    },
+    "active_payment_data": {
+      "alias": "Krokanticas2021",
+      "bank": "Mercado Pago",
+      "holder": "Matias Montes"
+    },
+    "shipping_zones": [
+      { "name": "Empalme V.C.", "cost": 3000 },
+      { "name": "Barrio Mitre (Pavón)", "cost": 3000 },
+      { "name": "Pavón", "cost": 4000 },
+      { "name": "Rincón de Pavón", "cost": 6000 }
+    ],
+    "schedule_lunch": "Martes a Viernes de 11:00 a 14:00 hs",
+    "schedule_dinner": "Miércoles a Domingo de 19:30 a 23:30 hs",
+    "schedule_notes": "Mediodía: Mar a Vie 11:00 a 14:00 hs · Noche: Mié a Dom 19:30 a 23:30 hs",
+    "schedules": {
+      "lunch": "Martes a Viernes de 11:00 a 14:00 hs",
+      "dinner": "Miércoles a Domingo de 19:30 a 23:30 hs",
+      "summary": "Mediodía: Mar a Vie 11:00 a 14:00 hs · Noche: Mié a Dom 19:30 a 23:30 hs"
+    },
+    "updated_at": 1787159836012
+  }
+}
+```
+
+### Actualización vía `PATCH /api/settings`:
 
 ```json
 {
   "businessId": "krokanticas",
   "storeOpen": true,
   "delayMinutes": 30,
-  "courierActive": true
+  "courierActive": true,
+  "activeAlias": 2,
+  "address": "Ruta 21 y calle Arroyo Seco. Empalme Villa Constitución.",
+  "scheduleLunch": "Martes a Viernes de 11:00 a 14:00 hs",
+  "scheduleDinner": "Miércoles a Domingo de 19:30 a 23:30 hs"
 }
 ```
 
-La demora solo admite 15, 30 o 45 minutos.
+- `courierActive` (o `courier_active`): `1`/`true` (Cadete disponible, ofrece envíos y retiros) o `0`/`false` (Cadete no disponible, el bot solo ofrece retiro en el local).
+- `active_payment_data`: entrega directamente el alias activo para que el bot de n8n lo envíe al cliente sin lógica condicional.
 
 ## Conversaciones y WhatsApp
 

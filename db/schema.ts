@@ -206,6 +206,18 @@ export const businessSettings = sqliteTable("business_settings", {
   storeOpen: integer("store_open", { mode: "boolean" }).notNull().default(1),
   delayMinutes: integer("delay_minutes").notNull().default(30),
   courierActive: integer("courier_active", { mode: "boolean" }).notNull().default(1),
+  address: text("address"),
+  activeAlias: integer("active_alias").default(1),
+  alias1Name: text("alias_1_name"),
+  alias1Bank: text("alias_1_bank"),
+  alias1Holder: text("alias_1_holder"),
+  alias2Name: text("alias_2_name"),
+  alias2Bank: text("alias_2_bank"),
+  alias2Holder: text("alias_2_holder"),
+  shippingZones: text("shipping_zones"),
+  scheduleLunch: text("schedule_lunch"),
+  scheduleDinner: text("schedule_dinner"),
+  scheduleNotes: text("schedule_notes"),
   updatedAt: integer("updated_at").notNull(),
 });
 

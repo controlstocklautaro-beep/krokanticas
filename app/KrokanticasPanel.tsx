@@ -5,14 +5,31 @@ import { CustomersModule, MessagesModule } from "./components/OperationalModules
 import { PwaInstall } from "./components/PwaInstall";
 import { UsersModule } from "./components/UsersModule";
 
-type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "users";
+type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "settings" | "users";
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Business = { id: string; name: string; modules: string[] };
 type Product = { id: string; name: string; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null };
 type Contact = { id: string; name: string; phone_number: string; address?: string | null };
 type OrderItem = { id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number };
 type Order = { id: string; contact_id: string; order_number: number; customer_name: string; phone_number: string; delivery_type: "pickup" | "delivery"; address?: string | null; zone?: string | null; payment_method: "cash" | "transfer"; scheduled_time: string; subtotal: number; shipping_cost: number; total: number; status: "confirmed" | "in_kitchen" | "ready" | "delivered" | "cancelled"; notes?: string | null; created_at: number; items: OrderItem[] };
-type Settings = { store_open: number; delay_minutes: number; courier_active: number };
+type AliasInfo = { alias: string; bank: string; holder: string; active: boolean };
+type ShippingZone = { name: string; cost: number };
+type Settings = {
+  store_open: number;
+  delay_minutes: number;
+  courier_active: number;
+  address: string;
+  active_alias: number;
+  alias_1: AliasInfo;
+  alias_2: AliasInfo;
+  active_payment_data: { alias: string; bank: string; holder: string };
+  shipping_zones: ShippingZone[];
+  schedule_lunch?: string;
+  schedule_dinner?: string;
+  schedule_notes?: string;
+  schedules?: { lunch: string; dinner: string; summary: string };
+  updated_at: number;
+};
 type Handoff = { id: string; contact_id?: string | null; order_id?: string | null; phone_number?: string | null; customer_name: string; reason: "complaint" | "ambiguity" | "human_request" | "post_confirmation_change" | "other"; summary: string; priority: "low" | "medium" | "high"; status: "open" | "in_progress" | "resolved"; assigned_to?: string | null; created_at: number; updated_at: number; resolved_at?: number | null };
 
 const sections: { id: Section; label: string; icon: string; group: string }[] = [
@@ -22,6 +39,7 @@ const sections: { id: Section; label: string; icon: string; group: string }[] = 
   { id: "messages", label: "Conversaciones", icon: "◌", group: "ATENCIÓN" },
   { id: "handoffs", label: "Derivaciones", icon: "!", group: "ATENCIÓN" },
   { id: "contacts", label: "Contactos", icon: "◎", group: "ATENCIÓN" },
+  { id: "settings", label: "Configuración", icon: "⚙", group: "CONFIGURACIÓN" },
   { id: "users", label: "Usuarios", icon: "♙", group: "CONFIGURACIÓN" },
 ];
 
@@ -64,7 +82,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
   const name = user.displayName.includes("@") ? `Equipo ${business.name}` : user.displayName;
   const visibleSections = sections.filter((section) => {
     if (section.id === "overview") return true;
-    if (section.id === "users" && !["owner", "admin"].includes(user.role)) return false;
+    if (["users", "settings"].includes(section.id) && !["owner", "admin"].includes(user.role)) return false;
     return business.modules.length === 0 || business.modules.includes(section.id);
   });
   const choose = (section: Section) => { setActive(section); setMobileOpen(false); };
@@ -87,6 +105,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
         {active === "messages" && <div className="k-module"><MessagesModule businessId={business.id} /></div>}
         {active === "handoffs" && <HandoffsModule businessId={business.id} />}
         {active === "contacts" && <div className="k-module"><CustomersModule businessId={business.id} /></div>}
+        {active === "settings" && <SettingsModule businessId={business.id} />}
         {active === "users" && ["owner", "admin"].includes(user.role) && <UsersModule businessId={business.id} currentUser={{ id: user.id, email: user.email, role: user.role }} />}
       </section>
     </main>
@@ -124,7 +143,7 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
     }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
   }, [businessId]);
 
-  async function updateSettings(change: Partial<{ storeOpen: boolean; delayMinutes: number; courierActive: boolean }>) {
+  async function updateSettings(change: Record<string, unknown>) {
     try {
       await api("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, ...change }) });
       await reload();
@@ -144,21 +163,357 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
       <div className="k-card"><div className="k-card-head"><div><span className="k-eyebrow">PEDIDOS</span><h2>Confirmados pendientes</h2></div><button onClick={() => onNavigate("kitchen")}>Ver cocina →</button></div>{activeOrders.slice(0, 4).map((order) => <div className="k-mini-order" key={order.id}><b>#{String(order.order_number).padStart(3, "0")}</b><span><strong>{order.customer_name}</strong><small>{order.items.reduce((sum, item) => sum + item.quantity, 0)} unidades · {order.delivery_type === "delivery" ? "Envío" : "Retiro"}</small></span><em>{order.scheduled_time}</em></div>)}{!activeOrders.length && <div className="k-empty">No hay pedidos pendientes.</div>}</div>
       <div className="k-card"><div className="k-card-head"><div><span className="k-eyebrow">ATENCIÓN</span><h2>Acciones rápidas</h2></div></div><div className="k-quick"><button onClick={() => onNavigate("handoffs")}><span>!</span><strong>Resolver derivaciones</strong><small>Reclamos y casos ambiguos</small></button><button onClick={() => onNavigate("messages")}><span>◌</span><strong>Ver conversaciones</strong><small>Atender o apagar el bot</small></button><button onClick={() => onNavigate("stock")}><span>◫</span><strong>Actualizar stock</strong><small>Disponible, poco o agotado</small></button><button onClick={() => onNavigate("contacts")}><span>◎</span><strong>Buscar contacto</strong><small>{contacts.length} contactos con dirección por API</small></button></div></div>
     </div>
-    <div className="k-card k-integrations"><div className="k-card-head"><div><span className="k-eyebrow">CONEXIONES EXTERNAS</span><h2>Preparadas para integrar</h2></div><small>El panel ya funciona sin estas conexiones</small></div><div className="k-integration-list"><div><span>WhatsApp Business oficial</span><b>Pendiente de credenciales</b></div><div><span>Automatizaciones n8n</span><b>Pendiente de webhook y clave</b></div><div><span>Agente IA y audios</span><b>Pendiente de proveedor</b></div></div></div>
+    <div className="k-overview-grid" style={{ marginTop: "16px" }}>
+      <div className="k-card">
+        <div className="k-card-head">
+          <div><span className="k-eyebrow">TRANSFERENCIAS Y COBROS</span><h2>Alias de Pago</h2></div>
+          <span className="k-badge-active">Alias {settings?.active_alias ?? 1} activo</span>
+        </div>
+        <div className="k-alias-list">
+          <div
+            className={`k-alias-item ${settings?.active_alias === 1 ? "selected" : ""}`}
+            onClick={() => updateSettings({ activeAlias: 1 })}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="k-alias-top">
+              <span className="k-alias-radio">{settings?.active_alias === 1 ? "●" : "○"}</span>
+              <strong>ALIAS 1</strong>
+              {settings?.active_alias === 1 && <span className="k-tag-active">ACTIVO</span>}
+            </div>
+            <div className="k-alias-body">
+              <div><small>Alias:</small> <b>{settings?.alias_1?.alias || "Krokanticas2021"}</b></div>
+              <div><small>Billetera/Banco:</small> <span>{settings?.alias_1?.bank || "Mercado Pago"}</span></div>
+              <div><small>Titular:</small> <span>{settings?.alias_1?.holder || "Matias Montes"}</span></div>
+            </div>
+          </div>
+
+          <div
+            className={`k-alias-item ${settings?.active_alias === 2 ? "selected" : ""}`}
+            onClick={() => updateSettings({ activeAlias: 2 })}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="k-alias-top">
+              <span className="k-alias-radio">{settings?.active_alias === 2 ? "●" : "○"}</span>
+              <strong>ALIAS 2</strong>
+              {settings?.active_alias === 2 && <span className="k-tag-active">ACTIVO</span>}
+            </div>
+            <div className="k-alias-body">
+              <div><small>Alias:</small> <b>{settings?.alias_2?.alias || "Krokan2021"}</b></div>
+              <div><small>Billetera/Banco:</small> <span>{settings?.alias_2?.bank || "Mercado Pago"}</span></div>
+              <div><small>Titular:</small> <span>{settings?.alias_2?.holder || "Fabian Gonzalo Montes"}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="k-card">
+        <div className="k-card-head">
+          <div><span className="k-eyebrow">LOGÍSTICA Y LOCAL</span><h2>Dirección y Zonas</h2></div>
+        </div>
+        <div className="k-local-info">
+          <div className="k-address-box">
+            <span className="k-icon">📍</span>
+            <div>
+              <small>Dirección para retiros en el local</small>
+              <strong>{settings?.address || "Ruta 21 y calle Arroyo Seco. Empalme Villa Constitución."}</strong>
+            </div>
+          </div>
+          <div className="k-zones-box">
+            <small>Tarifas de envío por zona:</small>
+            <div className="k-zones-grid">
+              {(settings?.shipping_zones || []).map((zone, idx) => (
+                <div key={idx} className="k-zone-pill">
+                  <span>{zone.name}</span>
+                  <b>{money(zone.cost)}</b>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div className="k-card k-integrations" style={{ marginTop: "16px" }}><div className="k-card-head"><div><span className="k-eyebrow">CONEXIONES EXTERNAS</span><h2>Preparadas para integrar</h2></div><small>El panel ya funciona sin estas conexiones</small></div><div className="k-integration-list"><div><span>WhatsApp Business oficial</span><b>Pendiente de credenciales</b></div><div><span>Automatizaciones n8n</span><b>Pendiente de webhook y clave</b></div><div><span>Agente IA y audios</span><b>Pendiente de proveedor</b></div></div></div>
   </div>;
 }
 
 function StockModule({ businessId }: { businessId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [error, setError] = useState("");
-  async function reload() { const data = await api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`); setProducts(data.products); }
-  useEffect(() => { void api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`).then((data) => setProducts(data.products)).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, [businessId]);
-  async function adjust(product: Product, delta: number) { try { await api("/api/stock/adjust", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, productId: product.id, delta }) }); await reload(); } catch (adjustError) { setError(adjustError instanceof Error ? adjustError.message : "No se pudo ajustar"); } }
-  async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!editing) return; const form = new FormData(event.currentTarget); const status = String(form.get("status")); try { await api("/api/stock", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: editing.id, name: form.get("name"), price: Number(form.get("price")), aliases: String(form.get("aliases") || "").split(","), stockStatus: status, stockQuantity: status === "limited" ? Number(form.get("quantity")) : null, active: true }) }); setEditing(null); await reload(); } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "No se pudo guardar"); } }
+  const [busy, setBusy] = useState(false);
+
+  async function reload() {
+    const data = await api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`);
+    setProducts(data.products);
+  }
+
+  useEffect(() => {
+    void api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`)
+      .then((data) => setProducts(data.products))
+      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+  }, [businessId]);
+
+  async function adjust(product: Product, delta: number) {
+    try {
+      await api("/api/stock/adjust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId, productId: product.id, delta }),
+      });
+      await reload();
+    } catch (adjustError) {
+      setError(adjustError instanceof Error ? adjustError.message : "No se pudo ajustar");
+    }
+  }
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    const form = new FormData(event.currentTarget);
+    const status = String(form.get("status"));
+    try {
+      await api("/api/stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          name: form.get("name"),
+          price: Number(form.get("price")),
+          aliases: String(form.get("aliases") || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          stockStatus: status,
+          stockQuantity: status === "limited" ? Number(form.get("quantity")) : null,
+          active: true,
+        }),
+      });
+      setCreating(false);
+      await reload();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "No se pudo crear el producto");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    setBusy(true);
+    const form = new FormData(event.currentTarget);
+    const status = String(form.get("status"));
+    try {
+      await api("/api/stock", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          id: editing.id,
+          name: form.get("name"),
+          price: Number(form.get("price")),
+          aliases: String(form.get("aliases") || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+          stockStatus: status,
+          stockQuantity: status === "limited" ? Number(form.get("quantity")) : null,
+          active: true,
+        }),
+      });
+      setEditing(null);
+      await reload();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(product: Product) {
+    if (!window.confirm(`¿Estás seguro de que querés eliminar la variedad "${product.name}"?`)) return;
+    setBusy(true);
+    try {
+      await api("/api/stock", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId, id: product.id }),
+      });
+      setEditing(null);
+      await reload();
+    } catch (delError) {
+      setError(delError instanceof Error ? delError.message : "No se pudo eliminar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const filtered = products.filter((product) => product.name.toLowerCase().includes(search.toLowerCase()));
-  return <div className="k-module"><div className="k-heading"><div><span className="k-eyebrow">{products.length} VARIEDADES</span><h1>Stock del día</h1><p>Solo cargá una cantidad exacta cuando queden pocas unidades.</p></div><label className="k-search">⌕<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar variedad" /></label></div>{error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}<div className="k-stock-grid">{filtered.map((product) => <article className={`k-stock-card ${product.stock_status}`} key={product.id}><div className="k-stock-top"><span className="k-food-icon">◒</span><b className="k-stock-state">{product.stock_status === "available" ? "DISPONIBLE" : product.stock_status === "limited" ? "POCO STOCK" : "AGOTADA"}</b></div><h2>{product.name}</h2><p>{money(product.price)} por unidad</p><div className="k-stock-bottom">{product.stock_status === "limited" ? <div className="k-stepper"><button onClick={() => adjust(product, -1)}>−</button><strong>{product.stock_quantity}</strong><button onClick={() => adjust(product, 1)}>＋</button></div> : <small>{product.stock_status === "available" ? "Sin cantidad limitada" : "No aceptar pedidos"}</small>}<button className="k-edit" onClick={() => setEditing(product)}>Editar</button></div></article>)}</div>{editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><form className="modal k-modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="k-eyebrow">VARIEDAD</span><h2>Editar stock</h2></div><button type="button" onClick={() => setEditing(null)}>×</button></div><label>Nombre<input name="name" defaultValue={editing.name} required /></label><div className="form-grid"><label>Precio<input name="price" type="number" min="0" defaultValue={editing.price} /></label><label>Estado<select name="status" defaultValue={editing.stock_status}><option value="available">Disponible</option><option value="limited">Poco stock</option><option value="soldout">Agotada</option></select></label></div><label>Cantidad restante<input name="quantity" type="number" min="0" defaultValue={editing.stock_quantity ?? 0} /></label><label>Sinónimos separados por coma<textarea name="aliases" defaultValue={editing.aliases.join(", ")} /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button><button className="k-primary">Guardar cambios</button></div></form></div>}</div>;
+
+  return (
+    <div className="k-module">
+      <div className="k-heading">
+        <div>
+          <span className="k-eyebrow">{products.length} VARIEDADES EN CATÁLOGO</span>
+          <h1>Stock y Catálogo</h1>
+          <p>Creá nuevos sabores, editá precios, controlá disponibilidad o eliminá productos.</p>
+        </div>
+        <button className="k-primary" onClick={() => setCreating(true)}>＋ Nueva Variedad</button>
+      </div>
+
+      <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px" }}>
+        <label className="k-search" style={{ flex: 1 }}>
+          ⌕
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por sabor o ingrediente..."
+          />
+        </label>
+      </div>
+
+      {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
+
+      <div className="k-stock-grid">
+        {filtered.map((product) => (
+          <article className={`k-stock-card ${product.stock_status}`} key={product.id}>
+            <div className="k-stock-top">
+              <span className="k-food-icon">◒</span>
+              <b className="k-stock-state">
+                {product.stock_status === "available" ? "DISPONIBLE" : product.stock_status === "limited" ? "POCO STOCK" : "AGOTADA"}
+              </b>
+            </div>
+            <h2>{product.name}</h2>
+            <p>{money(product.price)} por unidad</p>
+            {product.aliases && product.aliases.length > 0 && (
+              <small style={{ color: "var(--k-muted)", fontSize: "11px", display: "block", marginBottom: "8px" }}>
+                Sinónimos: {product.aliases.join(", ")}
+              </small>
+            )}
+            <div className="k-stock-bottom">
+              {product.stock_status === "limited" ? (
+                <div className="k-stepper">
+                  <button onClick={() => adjust(product, -1)}>−</button>
+                  <strong>{product.stock_quantity}</strong>
+                  <button onClick={() => adjust(product, 1)}>＋</button>
+                </div>
+              ) : (
+                <small>{product.stock_status === "available" ? "Disponible sin límite" : "No acepta pedidos"}</small>
+              )}
+              <div style={{ display: "flex", gap: "6px", marginLeft: "auto" }}>
+                <button className="k-edit" onClick={() => setEditing(product)}>Editar</button>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {/* Modal Crear Nueva Variedad */}
+      {creating && (
+        <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
+          <form className="modal k-modal" onSubmit={handleCreate} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="k-eyebrow">CATÁLOGO</span>
+                <h2>Nueva Variedad</h2>
+              </div>
+              <button type="button" onClick={() => setCreating(false)}>×</button>
+            </div>
+            <label>
+              Nombre del sabor / producto
+              <input name="name" placeholder="Ej: Jamón y muzzarella especial" required autoFocus />
+            </label>
+            <div className="form-grid">
+              <label>
+                Precio unitario ($)
+                <input name="price" type="number" min="0" defaultValue="2600" step="50" required />
+              </label>
+              <label>
+                Estado inicial
+                <select name="status" defaultValue="available">
+                  <option value="available">Disponible</option>
+                  <option value="limited">Poco stock (con límite)</option>
+                  <option value="soldout">Agotada</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Cantidad inicial (si tiene poco stock)
+              <input name="quantity" type="number" min="0" defaultValue="10" />
+            </label>
+            <label>
+              Sinónimos y abreviaturas para el bot de IA (separados por coma)
+              <textarea name="aliases" placeholder="Ej: jyq, jamon queso, jamon y muzza" />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setCreating(false)}>Cancelar</button>
+              <button className="k-primary" disabled={busy}>{busy ? "Creando..." : "Crear Variedad"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal Editar Variedad */}
+      {editing && (
+        <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
+          <form className="modal k-modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="k-eyebrow">CATÁLOGO</span>
+                <h2>Editar Variedad</h2>
+              </div>
+              <button type="button" onClick={() => setEditing(null)}>×</button>
+            </div>
+            <label>
+              Nombre
+              <input name="name" defaultValue={editing.name} required />
+            </label>
+            <div className="form-grid">
+              <label>
+                Precio ($)
+                <input name="price" type="number" min="0" defaultValue={editing.price} step="50" required />
+              </label>
+              <label>
+                Estado
+                <select name="status" defaultValue={editing.stock_status}>
+                  <option value="available">Disponible</option>
+                  <option value="limited">Poco stock</option>
+                  <option value="soldout">Agotada</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Cantidad restante
+              <input name="quantity" type="number" min="0" defaultValue={editing.stock_quantity ?? 0} />
+            </label>
+            <label>
+              Sinónimos separados por coma (para el bot de WhatsApp)
+              <textarea name="aliases" defaultValue={editing.aliases.join(", ")} />
+            </label>
+            <div className="modal-actions" style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+              <button
+                type="button"
+                className="secondary"
+                style={{ color: "#9d432e", borderColor: "#f4d7cf", background: "#fff5f3" }}
+                onClick={() => remove(editing)}
+                disabled={busy}
+              >
+                🗑 Eliminar variedad
+              </button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button>
+                <button className="k-primary" disabled={busy}>{busy ? "Guardando..." : "Guardar cambios"}</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function HandoffsModule({ businessId }: { businessId: string }) {
@@ -253,3 +608,359 @@ function KitchenModule({ businessId }: { businessId: string }) {
     {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><form className="modal k-modal k-order-modal" onSubmit={saveEdit} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="k-eyebrow">COMANDA #{editing.order_number}</span><h2>Editar pedido completo</h2></div><button type="button" onClick={() => setEditing(null)}>×</button></div><div className="form-grid"><label>Entrega<select name="deliveryType" defaultValue={editing.delivery_type}><option value="pickup">Retiro</option><option value="delivery">Envío</option></select></label><label>Pago<select name="paymentMethod" defaultValue={editing.payment_method}><option value="cash">Efectivo</option><option value="transfer">Transferencia</option></select></label></div><div className="form-grid"><label>Horario<input name="scheduledTime" defaultValue={editing.scheduled_time} /></label><label>Costo de envío<input name="shippingCost" type="number" min="0" defaultValue={editing.shipping_cost} /></label></div><label>Dirección<input name="address" defaultValue={editing.address || ""} /></label><label>Zona<input name="zone" defaultValue={editing.zone || ""} /></label><ProductPicker products={products} items={editItems} onChange={setEditItems} includeSoldout /><p className="k-form-note">Al guardar, el total y el stock limitado se recalculan automáticamente.</p><label>Observaciones<textarea name="notes" defaultValue={editing.notes || ""} /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button><button className="k-primary">Guardar pedido</button></div></form></div>}
   </div>;
 }
+
+function SettingsModule({ businessId }: { businessId: string }) {
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  // Zonas de envío en edición
+  const [zones, setZones] = useState<ShippingZone[]>([]);
+
+  async function load() {
+    try {
+      const data = await api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`);
+      setSettings(data.settings);
+      setZones(data.settings.shipping_zones || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error cargando configuración");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [businessId]);
+
+  async function update(change: Record<string, unknown>, successMsg = "Cambios guardados correctamente") {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const data = await api<{ success: boolean; settings: Settings }>("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId, ...change }),
+      });
+      setSettings(data.settings);
+      setZones(data.settings.shipping_zones || []);
+      setMessage(successMsg);
+      setTimeout(() => setMessage(""), 3500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo actualizar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleZoneChange(index: number, field: "name" | "cost", val: string | number) {
+    const updated = [...zones];
+    if (field === "name") updated[index].name = String(val);
+    if (field === "cost") updated[index].cost = Number(val) || 0;
+    setZones(updated);
+  }
+
+  function addZone() {
+    setZones([...zones, { name: "Nueva zona", cost: 3000 }]);
+  }
+
+  function removeZone(index: number) {
+    setZones(zones.filter((_, idx) => idx !== index));
+  }
+
+  if (loading) return <div className="k-module"><div className="k-empty">Cargando configuración...</div></div>;
+
+  return (
+    <div className="k-module">
+      <div className="k-heading">
+        <div>
+          <span className="k-eyebrow">CONFIGURACIÓN GENERAL</span>
+          <h1>Panel de Control del Negocio</h1>
+          <p>Configurá el local, cadete, horarios, alias de pago y tarifas de envío en tiempo real.</p>
+        </div>
+      </div>
+
+      {message && <div className="k-success-banner">{message}</div>}
+      {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
+
+      {/* 1. Turno, Cadete y Demora */}
+      <div className="k-config-section">
+        <h2>1. Estado Operativo y Cadete</h2>
+        <p className="k-config-desc">El cadete es opcional según haya o no repartidor en el turno. Si está apagado, el bot solo ofrece retiro por el local.</p>
+        <div className="k-settings">
+          <button
+            className={settings?.store_open ? "on" : "off"}
+            disabled={saving}
+            onClick={() => update({ storeOpen: !settings?.store_open }, settings?.store_open ? "Local cerrado" : "Local abierto")}
+          >
+            <span>{settings?.store_open ? "ABIERTO" : "CERRADO"}</span>
+            <strong>Local</strong>
+            <small>Tocá para alternar estado</small>
+          </button>
+
+          <button
+            className={settings?.courier_active ? "on" : "off"}
+            disabled={saving}
+            onClick={() => update({ courierActive: !settings?.courier_active }, settings?.courier_active ? "Cadete desactivado (solo retiros)" : "Cadete activado (envíos disponibles)")}
+          >
+            <span>{settings?.courier_active ? "DISPONIBLE" : "NO DISPONIBLE"}</span>
+            <strong>Cadete / Envíos</strong>
+            <small>{settings?.courier_active ? "Aceptando envíos" : "Solo retiro en el local"}</small>
+          </button>
+
+          <button
+            disabled={saving}
+            onClick={() => {
+              const next = settings?.delay_minutes === 15 ? 30 : settings?.delay_minutes === 30 ? 45 : 15;
+              update({ delayMinutes: next }, `Demora actualizada a ${next} min`);
+            }}
+          >
+            <span>DEMORA ACTUAL</span>
+            <strong>{settings?.delay_minutes ?? 30} min</strong>
+            <small>Rotar a 15, 30 o 45 min</small>
+          </button>
+        </div>
+      </div>
+
+      <div className="k-config-grid">
+        {/* 2. Horarios de Atención */}
+        <div className="k-card">
+          <div className="k-card-head">
+            <div>
+              <span className="k-eyebrow">HORARIOS</span>
+              <h2>Días y Horarios de Atención</h2>
+            </div>
+          </div>
+          <div className="k-card-body">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const f = new FormData(e.currentTarget);
+                update({
+                  scheduleLunch: String(f.get("scheduleLunch") || "").trim(),
+                  scheduleDinner: String(f.get("scheduleDinner") || "").trim(),
+                }, "Horarios actualizados correctamente");
+              }}
+              className="k-config-form"
+            >
+              <label>
+                <b>Turno Mediodía</b>
+                <input
+                  name="scheduleLunch"
+                  defaultValue={settings?.schedule_lunch || "Martes a Viernes de 11:00 a 14:00 hs"}
+                  required
+                />
+                <small>Ej: Martes a Viernes de 11:00 a 14:00 hs</small>
+              </label>
+
+              <label>
+                <b>Turno Noche</b>
+                <input
+                  name="scheduleDinner"
+                  defaultValue={settings?.schedule_dinner || "Miércoles a Domingo de 19:30 a 23:30 hs"}
+                  required
+                />
+                <small>Ej: Miércoles a Domingo de 19:30 a 23:30 hs</small>
+              </label>
+
+              <button className="k-primary" disabled={saving} style={{ marginTop: "8px" }}>
+                {saving ? "Guardando..." : "Guardar Horarios"}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* 3. Dirección del Local */}
+        <div className="k-card">
+          <div className="k-card-head">
+            <div>
+              <span className="k-eyebrow">UBICACIÓN</span>
+              <h2>Dirección del Local</h2>
+            </div>
+          </div>
+          <div className="k-card-body">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const f = new FormData(e.currentTarget);
+                update({
+                  address: String(f.get("address") || "").trim(),
+                }, "Dirección actualizada correctamente");
+              }}
+              className="k-config-form"
+            >
+              <label>
+                <b>Dirección física (para retiros de clientes)</b>
+                <textarea
+                  name="address"
+                  rows={3}
+                  defaultValue={settings?.address || "Ruta 21 y calle Arroyo Seco. Empalme Villa Constitución."}
+                  required
+                />
+                <small>Esta dirección es la que el bot le envía a los clientes cuando eligen retirar en el local.</small>
+              </label>
+
+              <button className="k-primary" disabled={saving} style={{ marginTop: "8px" }}>
+                {saving ? "Guardando..." : "Guardar Dirección"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Cuentas y Alias de Pago */}
+      <div className="k-card" style={{ marginTop: "18px" }}>
+        <div className="k-card-head">
+          <div>
+            <span className="k-eyebrow">COBRANZAS Y TRANSFERENCIAS</span>
+            <h2>Alias de Pago y Cuentas Bancarias</h2>
+          </div>
+          <span className="k-badge-active">Alias {settings?.active_alias ?? 1} ACTIVO PARA EL BOT</span>
+        </div>
+
+        <div className="k-card-body">
+          <p className="k-config-desc">
+            Podés alternar cuál alias usa el bot con un solo clic en la tarjeta, o modificar los datos de cada titular abajo:
+          </p>
+
+          <div className="k-alias-list" style={{ marginBottom: "16px" }}>
+            <div
+              className={`k-alias-item ${settings?.active_alias === 1 ? "selected" : ""}`}
+              onClick={() => update({ activeAlias: 1 }, "Alias 1 seleccionado como activo para el bot")}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="k-alias-top">
+                <span className="k-alias-radio">{settings?.active_alias === 1 ? "●" : "○"}</span>
+                <strong>ALIAS 1</strong>
+                {settings?.active_alias === 1 && <span className="k-tag-active">ACTIVO PARA EL BOT</span>}
+              </div>
+              <div className="k-alias-body">
+                <div><small>Alias:</small> <b>{settings?.alias_1?.alias || "Krokanticas2021"}</b></div>
+                <div><small>Billetera/Banco:</small> <span>{settings?.alias_1?.bank || "Mercado Pago"}</span></div>
+                <div><small>Titular:</small> <span>{settings?.alias_1?.holder || "Matias Montes"}</span></div>
+              </div>
+            </div>
+
+            <div
+              className={`k-alias-item ${settings?.active_alias === 2 ? "selected" : ""}`}
+              onClick={() => update({ activeAlias: 2 }, "Alias 2 seleccionado como activo para el bot")}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="k-alias-top">
+                <span className="k-alias-radio">{settings?.active_alias === 2 ? "●" : "○"}</span>
+                <strong>ALIAS 2</strong>
+                {settings?.active_alias === 2 && <span className="k-tag-active">ACTIVO PARA EL BOT</span>}
+              </div>
+              <div className="k-alias-body">
+                <div><small>Alias:</small> <b>{settings?.alias_2?.alias || "Krokan2021"}</b></div>
+                <div><small>Billetera/Banco:</small> <span>{settings?.alias_2?.bank || "Mercado Pago"}</span></div>
+                <div><small>Titular:</small> <span>{settings?.alias_2?.holder || "Fabian Gonzalo Montes"}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              update({
+                alias1Name: String(f.get("alias1Name") || "").trim(),
+                alias1Bank: String(f.get("alias1Bank") || "").trim(),
+                alias1Holder: String(f.get("alias1Holder") || "").trim(),
+                alias2Name: String(f.get("alias2Name") || "").trim(),
+                alias2Bank: String(f.get("alias2Bank") || "").trim(),
+                alias2Holder: String(f.get("alias2Holder") || "").trim(),
+              }, "Datos de cuentas y alias actualizados correctamente");
+            }}
+            className="k-config-form"
+          >
+            <div className="k-alias-edit-grid">
+              <fieldset className="k-alias-box">
+                <legend><b>Editar Datos de Alias 1</b></legend>
+                <label>Alias<input name="alias1Name" defaultValue={settings?.alias_1?.alias || "Krokanticas2021"} required /></label>
+                <label>Billetera / Banco<input name="alias1Bank" defaultValue={settings?.alias_1?.bank || "Mercado Pago"} required /></label>
+                <label>Titular de la cuenta<input name="alias1Holder" defaultValue={settings?.alias_1?.holder || "Matias Montes"} required /></label>
+              </fieldset>
+
+              <fieldset className="k-alias-box">
+                <legend><b>Editar Datos de Alias 2</b></legend>
+                <label>Alias<input name="alias2Name" defaultValue={settings?.alias_2?.alias || "Krokan2021"} required /></label>
+                <label>Billetera / Banco<input name="alias2Bank" defaultValue={settings?.alias_2?.bank || "Mercado Pago"} required /></label>
+                <label>Titular de la cuenta<input name="alias2Holder" defaultValue={settings?.alias_2?.holder || "Fabian Gonzalo Montes"} required /></label>
+              </fieldset>
+            </div>
+
+            <button className="k-primary" disabled={saving} style={{ marginTop: "12px" }}>
+              {saving ? "Guardando..." : "Guardar Cuentas y Titulares"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* 5. Zonas de Envío y Costos */}
+      <div className="k-card" style={{ marginTop: "18px" }}>
+        <div className="k-card-head">
+          <div>
+            <span className="k-eyebrow">TARIFAS DE ENVÍO</span>
+            <h2>Zonas de Entrega y Costos</h2>
+          </div>
+          <button type="button" className="k-secondary" onClick={addZone}>＋ Agregar Zona</button>
+        </div>
+
+        <div className="k-card-body">
+          <p className="k-config-desc">
+            Estas son las zonas y precios que el bot y la comanda de cocina utilizan para calcular el costo de envío:
+          </p>
+
+          <div className="k-zones-edit-list">
+            {zones.map((zone, idx) => (
+              <div key={idx} className="k-zone-edit-row">
+                <input
+                  type="text"
+                  placeholder="Nombre de la zona"
+                  value={zone.name}
+                  onChange={(e) => handleZoneChange(idx, "name", e.target.value)}
+                  required
+                />
+                <div className="k-zone-cost-input">
+                  <span>$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    placeholder="Costo"
+                    value={zone.cost}
+                    onChange={(e) => handleZoneChange(idx, "cost", e.target.value)}
+                    required
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="k-btn-del"
+                  onClick={() => removeZone(idx)}
+                  title="Eliminar zona"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            className="k-primary"
+            disabled={saving}
+            onClick={() => update({ shippingZones: zones }, "Tarifas de envío actualizadas")}
+          >
+            {saving ? "Guardando..." : "Guardar Tarifas de Envío"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

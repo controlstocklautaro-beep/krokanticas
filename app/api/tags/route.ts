@@ -3,12 +3,30 @@ import { getD1 } from "@/db";
 import { ApiError, apiErrorResponse, businessIdFrom } from "@/lib/server/api-utils";
 import { requireBusinessAccess } from "@/lib/server/business-context";
 
+const DEFAULT_TAGS = [
+  ["Nuevo cliente", "#5477ef"],
+  ["Pedido en curso", "#ed6a2c"],
+  ["Cliente frecuente", "#35a47b"],
+  ["Reclamo", "#e04040"],
+  ["Pendiente de pago", "#e4a140"],
+];
+
 export async function GET(req: Request) {
   try {
     const businessId = businessIdFrom(req);
     await requireBusinessAccess(req, businessId);
-    const result = await getD1().prepare("SELECT id, name, color FROM tags WHERE business_id = ? ORDER BY name ASC")
-      .bind(businessId).all();
+    const db = getD1();
+    let result = await db.prepare("SELECT id, name, color FROM tags WHERE business_id = ? ORDER BY name ASC")
+      .bind(businessId).all<{ id: string; name: string; color: string }>();
+    if (!result.results.length) {
+      const now = Date.now();
+      for (const [name, color] of DEFAULT_TAGS) {
+        await db.prepare("INSERT INTO tags (id, business_id, name, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+          .bind(crypto.randomUUID(), businessId, name, color, now, now).run();
+      }
+      result = await db.prepare("SELECT id, name, color FROM tags WHERE business_id = ? ORDER BY name ASC")
+        .bind(businessId).all<{ id: string; name: string; color: string }>();
+    }
     return NextResponse.json({ tags: result.results });
   } catch (error) {
     return apiErrorResponse(error, "Error listando etiquetas");
