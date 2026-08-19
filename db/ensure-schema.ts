@@ -1,7 +1,5 @@
 import { getD1 } from "./index";
 
-let schemaReady: Promise<void> | null = null;
-
 const statements = [
   `CREATE TABLE IF NOT EXISTS businesses (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, business_type TEXT NOT NULL DEFAULT 'restaurant', plan TEXT NOT NULL DEFAULT 'base', n8n_webhook_url TEXT, integration_key_hash TEXT, created_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS memberships (business_id TEXT NOT NULL, user_id TEXT NOT NULL, email TEXT, role TEXT NOT NULL DEFAULT 'staff', active BIGINT NOT NULL DEFAULT 1, created_at BIGINT NOT NULL, PRIMARY KEY (business_id, user_id))`,
@@ -55,13 +53,30 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS handoffs_business_contact_idx ON handoffs (business_id, contact_id)`,
 ];
 
-export function ensureSchema(): Promise<void> {
-  if (!schemaReady) {
-    const db = getD1();
-    schemaReady = db.batch([
-      ...statements.map((sql) => db.prepare(sql.replaceAll(" INTEGER", " BIGINT"))),
-      db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS address TEXT"),
-    ]).then(() => undefined);
+let schemaReady = false;
+
+export async function ensureSchema(): Promise<void> {
+  if (schemaReady) return;
+  const db = getD1();
+  try {
+    await db.prepare("SELECT 1 FROM app_users LIMIT 1").first();
+    schemaReady = true;
+    return;
+  } catch {
+    // Si no existe la tabla app_users, inicializamos el esquema
   }
-  return schemaReady;
+
+  for (const sql of statements) {
+    try {
+      await db.prepare(sql.replaceAll(" INTEGER", " BIGINT")).run();
+    } catch {
+      // Continuar si ya existe o conflicto
+    }
+  }
+  try {
+    await db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS address TEXT").run();
+  } catch {
+    // Ignorar si ya existe
+  }
+  schemaReady = true;
 }
