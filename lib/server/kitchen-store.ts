@@ -106,10 +106,11 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
     }
   }
 
-  statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ? + ?, status = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" ? "transfer" : body.paymentMethod === "cash" ? "cash" : current.payment_method, body.scheduledTime === undefined ? current.scheduled_time : String(body.scheduledTime || "Ahora"), subtotal, shippingCost, subtotal, shippingCost, status, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
+  const total = subtotal + shippingCost;
+  statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ?, status = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" ? "transfer" : body.paymentMethod === "cash" ? "cash" : current.payment_method, body.scheduledTime === undefined ? current.scheduled_time : String(body.scheduledTime || "Ahora"), subtotal, shippingCost, total, status, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
   await db.batch(statements);
-  return { id, status, subtotal, total: subtotal + shippingCost };
+  return { id, status, subtotal, total };
 }
 
 export async function deleteKitchenOrder(businessId: string, id: string) {

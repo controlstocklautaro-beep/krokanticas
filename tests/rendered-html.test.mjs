@@ -45,7 +45,9 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(panel, /function StockModule/);
   assert.match(panel, /function KitchenModule/);
   assert.match(panel, /function HandoffsModule/);
-  assert.match(panel, /WhatsApp pendiente/);
+  assert.doesNotMatch(panel, /WhatsApp pendiente/);
+  assert.doesNotMatch(panel, /CONEXIONES EXTERNAS/);
+  assert.match(panel, /from "lucide-react"/);
   assert.match(panel, /Object\.entries\(editItems\)/);
   assert.match(panel, /<PwaInstall/);
   assert.match(panel, /<UsersModule/);
@@ -79,6 +81,7 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   const project = JSON.parse(packageJson);
   assert.equal(project.scripts.build, "next build");
   assert.ok(project.dependencies["@supabase/supabase-js"]);
+  assert.ok(project.dependencies["lucide-react"]);
   assert.ok(project.dependencies.postgres);
   assert.match(database, /DATABASE_URL/);
   assert.match(database, /SUPABASE_SECRET_KEY/);
@@ -127,6 +130,8 @@ test("includes persistent operational APIs and migrations", async () => {
   const kitchenStore = await readFile(new URL("lib/server/kitchen-store.ts", root), "utf8");
   assert.match(kitchenStore, /DELETE FROM order_items/);
   assert.match(kitchenStore, /subtotal = prepared\.reduce/);
+  assert.match(kitchenStore, /const total = subtotal \+ shippingCost/);
+  assert.doesNotMatch(kitchenStore, /total = \? \+ \?/);
   const stock = await readFile(new URL("app/api/stock/route.ts", root), "utf8");
   const contacts = await readFile(new URL("app/api/contacts/route.ts", root), "utf8");
   const adjust = await readFile(new URL("app/api/stock/adjust/route.ts", root), "utf8");

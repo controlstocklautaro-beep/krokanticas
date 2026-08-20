@@ -2,6 +2,20 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import {
+  ArrowLeft,
+  Bot,
+  ExternalLink,
+  MessageCircle,
+  Paperclip,
+  Search,
+  Send,
+  Tag,
+  Tags,
+  Trash2,
+  UserRound,
+  Zap,
+} from "lucide-react";
 
 type ChatRecord = {
   phone_number: string;
@@ -89,12 +103,12 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const QUICK_REPLIES = [
-    "¡Hola! ¿Cómo estás? Te dejamos nuestra carta de empanadas 🥟",
-    "¡Excelente! Tu pedido ya está confirmado y pasando a cocina 👨‍🍳",
-    "El cadete ya salió hacia tu domicilio con tu pedido 🛵",
-    "Tu pedido ya está listo para retirar por el local 🥟📍",
+    "¡Hola! ¿Cómo estás? Te dejamos nuestra carta de empanadas.",
+    "¡Excelente! Tu pedido ya está confirmado y pasando a cocina.",
+    "El cadete ya salió hacia tu domicilio con tu pedido.",
+    "Tu pedido ya está listo para retirar por el local.",
     "Te compartimos el alias de Mercado Pago para la transferencia: Krokanticas2021",
-    "¡Muchas gracias por tu compra! Que lo disfrutes mucho ⭐",
+    "¡Muchas gracias por tu compra! Que lo disfrutes mucho.",
   ];
 
   const TAG_COLORS = [
@@ -298,12 +312,13 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
   return (
     <div className="k-wa-container">
+      {error && <button className="module-error" onClick={() => setError("")}>{error} ×</button>}
       {/* Visualizador de imagen en grande */}
       {previewImage && (
         <div className="modal-backdrop" onMouseDown={() => setPreviewImage(null)}>
           <div className="k-img-modal" onMouseDown={(e) => e.stopPropagation()}>
             <button className="k-close-btn" onClick={() => setPreviewImage(null)}>✕</button>
-            <img src={previewImage} alt="Vista previa" className="k-full-img" />
+            <Image src={previewImage} alt="Vista previa" className="k-full-img" width={1200} height={900} unoptimized />
           </div>
         </div>
       )}
@@ -356,7 +371,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
         <aside className="k-wa-sidebar">
           {/* Header de la lista */}
           <div className="k-wa-sidebar-head">
-            <div className="k-wa-user-avatar">💬</div>
+            <div className="k-wa-user-avatar"><MessageCircle size={21} aria-hidden /></div>
             <div className="k-wa-head-title">
               <strong>Chats</strong>
               <small>{chats.length} conversaciones</small>
@@ -366,14 +381,14 @@ export function MessagesModule({ businessId }: { businessId: string }) {
               onClick={() => setCreatingTag(true)}
               title="Crear nueva etiqueta"
             >
-              🏷️＋
+              <Tags size={19} aria-hidden />
             </button>
           </div>
 
           {/* Buscador WhatsApp */}
           <div className="k-wa-search-box">
             <div className="k-wa-search-input">
-              <span>⌕</span>
+              <span><Search size={17} aria-hidden /></span>
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -395,13 +410,13 @@ export function MessagesModule({ businessId }: { businessId: string }) {
               className={`k-chip ${filterType === "bot_on" ? "active" : ""}`}
               onClick={() => setFilterType("bot_on")}
             >
-              🤖 Bot ON
+              <Bot size={16} aria-hidden /> Bot ON
             </button>
             <button
               className={`k-chip ${filterType === "bot_off" ? "active" : ""}`}
               onClick={() => setFilterType("bot_off")}
             >
-              👤 Humano
+              <UserRound size={16} aria-hidden /> Humano
             </button>
             {tags.map((t) => (
               <button
@@ -458,7 +473,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                       </div>
 
                       <span className={`k-wa-bot-badge ${chat.agent_active ? "on" : "off"}`}>
-                        {chat.agent_active ? "🤖 Bot ON" : "👤 Manual"}
+                        {chat.agent_active ? <><Bot size={13} aria-hidden /> Bot ON</> : <><UserRound size={13} aria-hidden /> Manual</>}
                       </span>
                     </div>
                   </div>
@@ -468,7 +483,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
             {!filteredChats.length && (
               <div className="k-wa-empty-list">
-                <span>◌</span>
+                <span><MessageCircle size={26} aria-hidden /></span>
                 <p>No se encontraron conversaciones con este filtro.</p>
               </div>
             )}
@@ -487,7 +502,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                 onClick={handleBack}
                 title="Volver a la lista de chats"
               >
-                ←
+                <ArrowLeft size={20} aria-hidden />
               </button>
 
               <div className="k-wa-avatar" style={{ background: selectedChat.agent_active ? "#e2f1ea" : "#fff1d9", color: selectedChat.agent_active ? "#1e805f" : "#a36a19" }}>
@@ -512,7 +527,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                   onClick={toggleBot}
                   title={selectedChat.agent_active ? "Pausar bot para intervenir como humano" : "Activar bot para que responda la IA"}
                 >
-                  {selectedChat.agent_active ? "🤖 Bot ON" : "👤 Manual"}
+                  {selectedChat.agent_active ? <><Bot size={16} aria-hidden /> Bot ON</> : <><UserRound size={16} aria-hidden /> Manual</>}
                 </button>
 
                 {/* Menú de Etiquetas */}
@@ -522,7 +537,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                     onClick={() => setTagMenu(!tagMenu)}
                     title="Asignar o quitar etiquetas"
                   >
-                    🏷️
+                    <Tag size={18} aria-hidden />
                   </button>
 
                   {tagMenu && (
@@ -559,12 +574,12 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                   className="k-wa-btn-ext"
                   title="Abrir chat en WhatsApp"
                 >
-                  📲
+                  <ExternalLink size={18} aria-hidden />
                 </a>
 
                 {/* Borrar Chat */}
                 <button className="k-wa-btn-del" onClick={deleteChat} title="Eliminar conversación">
-                  🗑
+                  <Trash2 size={18} aria-hidden />
                 </button>
               </div>
             </header>
@@ -596,10 +611,13 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                       {item.media_deleted && (item.type === "image" || item.type === "audio") ? (
                         <em className="k-wa-expired">Archivo vencido</em>
                       ) : item.type === "image" ? (
-                        <img
+                        <Image
                           src={item.message}
                           alt="Imagen enviada"
                           className="k-wa-img-msg"
+                          width={360}
+                          height={260}
+                          unoptimized
                           onClick={() => setPreviewImage(item.message)}
                         />
                       ) : item.type === "audio" ? (
@@ -650,7 +668,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                 onClick={() => setShowQuickReplies(!showQuickReplies)}
                 title="Respuestas rápidas predefinidas"
               >
-                ⚡
+                <Zap size={18} aria-hidden />
               </button>
 
               <input
@@ -666,7 +684,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                 onClick={() => fileInput.current?.click()}
                 title="Adjuntar imagen o comprobante"
               >
-                📎
+                <Paperclip size={18} aria-hidden />
               </button>
 
               <form
@@ -688,7 +706,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                   disabled={busy || !message.trim()}
                   title="Enviar mensaje"
                 >
-                  ➤
+                  <Send size={18} aria-hidden />
                 </button>
               </form>
             </footer>
@@ -696,7 +714,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
         ) : (
           <main className="k-wa-empty-window">
             <div className="k-wa-empty-box">
-              <div className="k-wa-big-icon">💬</div>
+              <div className="k-wa-big-icon"><MessageCircle size={38} aria-hidden /></div>
               <h2>WhatsApp Business Conectado</h2>
               <p>Seleccioná una conversación de la izquierda para ver los mensajes, responder como humano o activar el bot de IA.</p>
             </div>

@@ -59,6 +59,78 @@
   .k-install-help { width:min(270px,calc(100vw - 28px)); right:0; }
 }
 
+/* Iconos nativos y estados de acción */
+.k-nav-group button > span,
+.k-wa-big-icon {
+  display:grid;
+  place-items:center;
+}
+.k-nav-group button svg,
+.k-menu svg,
+.k-primary svg,
+.k-wa-tag-btn svg,
+.k-chip svg,
+.k-wa-bot-badge svg,
+.k-wa-toggle-bot svg,
+.k-wa-btn-tag svg,
+.k-wa-btn-ext svg,
+.k-wa-btn-del svg,
+.k-wa-quick-toggle svg,
+.k-wa-attach svg,
+.k-wa-send-btn svg,
+.k-wa-back-btn svg,
+.k-wa-big-icon svg {
+  width:1.15em;
+  height:1.15em;
+  stroke-width:2;
+}
+.k-notification-dot {
+  width:7px;
+  height:7px;
+  margin-left:auto;
+  border-radius:50%;
+  background:#ef8b48;
+}
+.k-live {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.k-live > i {
+  width:7px;
+  height:7px;
+  position:static;
+  display:block;
+  border-radius:50%;
+  background:var(--k-green);
+}
+.k-primary,
+.k-app .secondary,
+.k-wa-tag-btn,
+.k-wa-bot-badge,
+.k-wa-toggle-bot,
+.k-wa-btn-tag {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+.k-wa-btn-del {
+  display:grid;
+  place-items:center;
+}
+.k-order-card {
+  transition:opacity .18s ease, transform .18s ease;
+}
+.k-order-card.updating {
+  opacity:.72;
+  transform:translateY(1px);
+}
+.k-order-actions button:disabled {
+  cursor:wait;
+  opacity:.62;
+}
+
 @media (display-mode:standalone) {
   html,body { overscroll-behavior-y:none; }
   .k-app button { touch-action:manipulation; }
@@ -594,6 +666,5 @@
   .k-wa-btn-tag { padding:5px 8px; font-size:10px; }
   .k-wa-btn-ext, .k-wa-btn-del { width:30px; height:30px; }
 }
-
 
 
