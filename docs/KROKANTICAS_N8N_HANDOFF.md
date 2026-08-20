@@ -37,7 +37,7 @@ Ya queda listo en el código del panel:
 - interfaz responsive y PWA instalable;
 - almacenamiento y API de contactos, direcciones, conversaciones, mensajes, etiquetas, bot, stock, comandas, derivaciones y configuración;
 - descuento y devolución automática de stock al crear, editar o eliminar comandas;
-- webhook saliente de mensajes de texto escritos por un operador en el panel;
+- webhook saliente de textos, imágenes y audios enviados por un operador desde el panel;
 - almacenamiento temporal de imágenes y audios con limpieza programable;
 - contratos y ejemplos de todos los endpoints descritos en este documento.
 
@@ -47,9 +47,9 @@ Queda para la etapa de integración externa:
 - conectar el webhook oficial de Meta con n8n;
 - descargar los archivos entrantes desde Meta, transcribir audios y ejecutar el agente de IA;
 - implementar en n8n la memoria temporal, deduplicación, resolución de ambigüedades, zonas y confirmación explícita;
-- enviar a WhatsApp los textos que el panel entrega a `N8N_WEBHOOK_URL`;
+- recibir y enviar por WhatsApp los eventos que el panel entrega al webhook de Krokanticas;
 - conectar `PASSWORD_RESET_WEBHOOK_URL` para enviar por correo o mensajería el enlace de recuperación generado por el panel;
-- definir con el programador el envío de adjuntos salientes desde el panel. Las rutas `/api/upload-image` y `/api/upload-media` almacenan el archivo y el mensaje, pero actualmente no disparan por sí solas un envío a Meta;
+- procesar en n8n los eventos `outbound_message` que entregan `/api/send-message`, `/api/upload-image` y `/api/upload-media`, y enviarlos por Meta;
 - publicar la versión final, cargar usuarios autorizados y ejecutar el piloto.
 
 Importante: el panel queda funcional con datos locales sin estas conexiones, pero ninguna automatización debe considerarse habilitada en producción hasta completar y aprobar las pruebas de la sección 9.
@@ -235,7 +235,9 @@ Importante: después de crear una comanda no llamar a `/api/stock/adjust` para d
 Hay dos orígenes posibles:
 
 - Respuesta automática de n8n: n8n envía por Meta y después registra el texto con `POST /api/ingest-message`, usando `sender=agent`.
-- Respuesta escrita desde el panel: el panel llama `POST /api/send-message`; esa ruta guarda el mensaje y envía `{ businessId, phone_number, message }` a `N8N_WEBHOOK_URL`. n8n debe enviarlo por Meta y devolver cualquier respuesta HTTP `2xx`.
+- Respuesta escrita desde el panel: el panel llama `POST /api/send-message`; esa ruta guarda el mensaje y envía un evento `outbound_message` al webhook de Krokanticas. Los adjuntos enviados desde el panel hacen lo mismo desde `/api/upload-image` o `/api/upload-media`. n8n debe enviarlos por Meta y devolver cualquier respuesta HTTP `2xx`.
+
+El panel permite responder dentro de las 24 horas posteriores al último mensaje entrante del cliente. Fuera de esa ventana bloquea el envío interno y abre el chat en WhatsApp.
 
 n8n no debe llamar a `/api/send-message`; esa ruta es panel → n8n y podría generar un circuito. Para persistir una respuesta enviada por el agente automático, usar `/api/ingest-message` con `sender=agent`.
 
@@ -432,13 +434,32 @@ Respuesta:
 ```json
 {
   "success": true,
-  "url": "https://.../api/media/businesses/krokanticas/images/..."
+  "url": "/api/media/businesses/krokanticas/images/...",
+  "delivery": "sent"
 }
 ```
 
+Cuando `sender=agent`, el endpoint también llama al webhook con JSON:
+
+```json
+{
+  "event": "outbound_message",
+  "source": "krokanticas-panel",
+  "businessId": "krokanticas",
+  "phone_number": "+5491112345678",
+  "message": "https://...supabase.co/storage/v1/object/sign/...",
+  "type": "image",
+  "media_url": "https://...supabase.co/storage/v1/object/sign/...",
+  "content_type": "image/jpeg",
+  "file_name": "comprobante.jpg"
+}
+```
+
+`media_url` es temporal y permite que n8n descargue el archivo sin usar la sesión del panel.
+
 ### 6.7 `POST /api/upload-media`
 
-Igual que `upload-image`, pero el archivo debe ser `audio/*` y admite hasta 25 MB. Los nombres se mantienen exactamente como en Ramayo: `upload-image` para imagen y `upload-media` para audio.
+Igual que `upload-image`, pero el archivo debe ser `audio/*`, admite hasta 25 MB y entrega `type=audio`. Los nombres se mantienen exactamente como en Ramayo: `upload-image` para imagen y `upload-media` para audio.
 
 ### 6.8 `GET /api/contacts`
 
@@ -918,13 +939,16 @@ Acceso: solo panel autenticado.
 }
 ```
 
-Guarda el mensaje como `agent` y llama a `N8N_WEBHOOK_URL` con:
+Guarda el mensaje como `agent` y llama al webhook de Krokanticas con:
 
 ```json
 {
+  "event": "outbound_message",
+  "source": "krokanticas-panel",
   "businessId": "krokanticas",
   "phone_number": "+5491112345678",
-  "message": "Tu pedido está listo"
+  "message": "Tu pedido está listo",
+  "type": "text"
 }
 ```
 
@@ -1102,12 +1126,13 @@ Estos nombres no deben modificarse en n8n:
 7. Enviar confirmación por WhatsApp.
 8. Eliminar borrador temporal.
 
-### Workflow C — Mensaje escrito desde el panel
+### Workflow C — Mensaje enviado desde el panel
 
-1. Webhook configurado como `N8N_WEBHOOK_URL`.
+1. Recibir `event=outbound_message` en el webhook de Krokanticas.
 2. Validar una clave propia del webhook si se agrega.
-3. Enviar `message` al `phone_number` usando Meta.
-4. Responder HTTP `200` o `204` al panel.
+3. Si `type=text`, enviar `message` al `phone_number` usando Meta.
+4. Si `type=image` o `type=audio`, descargar `media_url` y enviar el archivo usando Meta.
+5. Responder HTTP `200` o `204` al panel.
 
 No volver a llamar a `ingest-message` en este workflow: `/api/send-message` ya guardó el mensaje antes de invocar n8n.
 

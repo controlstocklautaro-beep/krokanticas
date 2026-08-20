@@ -36,6 +36,12 @@ type MessageRecord = {
   created_at: number;
 };
 
+type ReplyWindow = {
+  checked: boolean;
+  canReply: boolean;
+  lastInboundAt: number | null;
+};
+
 type TagRecord = { id: string; name: string; color: string };
 type ContactRecord = {
   id: string;
@@ -100,7 +106,8 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesBodyRef = useRef<HTMLDivElement>(null);
+  const [replyWindow, setReplyWindow] = useState<ReplyWindow>({ checked: false, canReply: false, lastInboundAt: null });
 
   const QUICK_REPLIES = [
     "¡Hola! ¿Cómo estás? Te dejamos nuestra carta de empanadas.",
@@ -122,15 +129,13 @@ export function MessagesModule({ businessId }: { businessId: string }) {
     ]);
     setChats(chatData.chats);
     setTags(tagData.tags);
-    setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : chatData.chats[0]?.phone_number ?? null);
+    setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
   }
 
   async function refreshMessages(phoneNumber: string) {
-    const data = await api<{ messages: MessageRecord[] }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(phoneNumber)}`);
+    const data = await api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(phoneNumber)}`);
     setMessages(data.messages);
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, 100);
+    setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
   }
 
   useEffect(() => {
@@ -142,7 +147,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
       if (!active) return;
       setChats(chatData.chats);
       setTags(tagData.tags);
-      setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : chatData.chats[0]?.phone_number ?? null);
+      setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
     }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
     void refresh();
     const timer = window.setInterval(refresh, 6_000);
@@ -152,8 +157,12 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   useEffect(() => {
     if (!selectedPhone) return;
     let active = true;
-    const refresh = () => api<{ messages: MessageRecord[] }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(selectedPhone)}`)
-      .then((data) => { if (active) setMessages(data.messages); })
+    const refresh = () => api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(selectedPhone)}`)
+      .then((data) => {
+        if (!active) return;
+        setMessages(data.messages);
+        setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
+      })
       .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar mensajes"));
     void refresh();
     const timer = window.setInterval(refresh, 4_000);
@@ -161,7 +170,8 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   }, [businessId, selectedPhone]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+    const body = messagesBodyRef.current;
+    if (body) body.scrollTop = body.scrollHeight;
   }, [selectedPhone, messages.length]);
 
   const selectedChat = chats.find((chat) => chat.phone_number === selectedPhone) ?? null;
@@ -181,18 +191,24 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   async function send(textToSend?: string) {
     const outgoing = (typeof textToSend === "string" ? textToSend : message).trim();
     if (!selectedPhone || !outgoing) return;
+    if (replyWindow.checked && !replyWindow.canReply) {
+      openWhatsApp(outgoing);
+      return;
+    }
     setMessage("");
     setShowQuickReplies(false);
     setBusy(true);
     try {
-      await api("/api/send-message", {
+      const result = await api<{ success: boolean; delivery: "sent" | "failed" | "not_configured" }>("/api/send-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessId, phone_number: selectedPhone, message: outgoing }),
       });
       await Promise.all([refreshMessages(selectedPhone), refreshChats()]);
+      if (result.delivery !== "sent") setError("El mensaje quedó guardado, pero n8n no confirmó el envío a WhatsApp.");
     } catch (sendError) {
       setMessage(outgoing);
+      if (sendError instanceof Error && sendError.message.includes("24 horas")) openWhatsApp(outgoing);
       setError(sendError instanceof Error ? sendError.message : "No se pudo enviar");
     } finally {
       setBusy(false);
@@ -247,6 +263,10 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
   async function upload(file: File) {
     if (!selectedPhone) return;
+    if (replyWindow.checked && !replyWindow.canReply) {
+      openWhatsApp();
+      return;
+    }
     const endpoint = file.type.startsWith("image/") ? "/api/upload-image" : file.type.startsWith("audio/") ? "/api/upload-media" : null;
     if (!endpoint) {
       setError("Solo se admiten imágenes y audios");
@@ -259,9 +279,11 @@ export function MessagesModule({ businessId }: { businessId: string }) {
     form.set("file", file);
     setBusy(true);
     try {
-      await api(endpoint, { method: "POST", body: form });
+      const result = await api<{ success: boolean; delivery: "sent" | "failed" | "not_configured" }>(endpoint, { method: "POST", body: form });
       await refreshMessages(selectedPhone);
+      if (result.delivery !== "sent") setError("El archivo quedó guardado, pero n8n no confirmó el envío a WhatsApp.");
     } catch (uploadError) {
+      if (uploadError instanceof Error && uploadError.message.includes("24 horas")) openWhatsApp();
       setError(uploadError instanceof Error ? uploadError.message : "No se pudo subir el archivo");
     } finally {
       setBusy(false);
@@ -277,7 +299,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
       body: JSON.stringify({ businessId, phone_number: selectedPhone }),
     });
     setMessages([]);
-    setSelectedPhone(null);
+    handleBack();
     await refreshChats();
   }
 
@@ -293,21 +315,48 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
   useEffect(() => {
     function handlePopState() {
-      setSelectedPhone(null);
+      const phoneNumber = new URL(window.location.href).searchParams.get("chat");
+      setReplyWindow({ checked: false, canReply: false, lastInboundAt: null });
+      setSelectedPhone(phoneNumber);
     }
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   function openChat(phoneNumber: string) {
-    setSelectedPhone(phoneNumber);
+    if (phoneNumber !== selectedPhone) setReplyWindow({ checked: false, canReply: false, lastInboundAt: null });
     if (typeof window !== "undefined" && window.innerWidth <= 780) {
-      window.history.pushState({ krokanticasChat: phoneNumber }, "");
+      const url = new URL(window.location.href);
+      url.searchParams.set("chat", phoneNumber);
+      window.history.pushState(
+        { ...(window.history.state ?? {}), krokanticasChat: phoneNumber },
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
     }
+    setSelectedPhone(phoneNumber);
   }
 
   function handleBack() {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (window.history.state?.krokanticasChat && url.searchParams.has("chat")) {
+      setSelectedPhone(null);
+      window.history.back();
+      return;
+    }
+    url.searchParams.delete("chat");
+    const nextState = { ...(window.history.state ?? {}) };
+    delete nextState.krokanticasChat;
+    window.history.replaceState(nextState, "", `${url.pathname}${url.search}${url.hash}`);
     setSelectedPhone(null);
+  }
+
+  function openWhatsApp(prefilledMessage = "") {
+    if (!selectedPhone) return;
+    const phone = selectedPhone.replace(/\D/g, "");
+    const query = prefilledMessage ? `?text=${encodeURIComponent(prefilledMessage)}` : "";
+    window.open(`https://wa.me/${phone}${query}`, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -602,12 +651,12 @@ export function MessagesModule({ businessId }: { businessId: string }) {
             )}
 
             {/* Cuerpo de Mensajes con Fondo WhatsApp */}
-            <div className="k-wa-messages-body">
+            <div className="k-wa-messages-body" ref={messagesBodyRef}>
               {messages.map((item) => {
                 const isOut = item.sender === "agent";
                 return (
                   <div key={item.id} className={`k-wa-bubble-wrap ${isOut ? "out" : "in"}`}>
-                    <div className={`k-wa-bubble ${isOut ? "bubble-out" : "bubble-in"}`}>
+                    <div className={`k-wa-bubble ${isOut ? "bubble-out" : "bubble-in"} ${item.type === "audio" && !item.media_deleted ? "has-audio" : ""}`}>
                       {item.media_deleted && (item.type === "image" || item.type === "audio") ? (
                         <em className="k-wa-expired">Archivo vencido</em>
                       ) : item.type === "image" ? (
@@ -621,7 +670,9 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                           onClick={() => setPreviewImage(item.message)}
                         />
                       ) : item.type === "audio" ? (
-                        <audio controls src={item.message} className="k-wa-audio-msg" />
+                        <audio controls preload="metadata" src={item.message} className="k-wa-audio-msg">
+                          Tu navegador no puede reproducir este audio.
+                        </audio>
                       ) : (
                         <span className="k-wa-text-msg">{item.message}</span>
                       )}
@@ -640,7 +691,6 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                   <p>Todavía no hay mensajes en esta conversación. Escribí abajo para iniciar el chat.</p>
                 </div>
               )}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Panel de Respuestas Rápidas */}
@@ -662,6 +712,17 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
             {/* Barra de Composición (Composer) */}
             <footer className="k-wa-composer">
+              {replyWindow.checked && !replyWindow.canReply ? (
+                <div className="k-wa-window-expired">
+                  <div>
+                    <strong>Pasaron más de 24 horas desde el último mensaje del cliente.</strong>
+                    <small>{replyWindow.lastInboundAt
+                      ? `Último contacto: ${new Date(replyWindow.lastInboundAt).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}. Abrí WhatsApp para continuar.`
+                      : "No hay un mensaje entrante reciente. Abrí WhatsApp para continuar."}</small>
+                  </div>
+                  <button type="button" onClick={() => openWhatsApp(message)}>Abrir WhatsApp</button>
+                </div>
+              ) : <>
               <button
                 type="button"
                 className={`k-wa-quick-toggle ${showQuickReplies ? "active" : ""}`}
@@ -709,6 +770,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                   <Send size={18} aria-hidden />
                 </button>
               </form>
+              </>}
             </footer>
           </main>
         ) : (

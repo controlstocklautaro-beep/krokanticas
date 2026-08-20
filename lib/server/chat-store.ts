@@ -7,6 +7,21 @@ export type StoredChat = {
   updated_at: number;
 };
 
+export const WHATSAPP_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export async function whatsappReplyWindow(businessId: string, phoneNumber: string, now = Date.now()) {
+  const latest = await getD1().prepare(`
+    SELECT created_at FROM messages
+    WHERE business_id = ? AND phone_number = ? AND sender = 'user'
+    ORDER BY created_at DESC LIMIT 1
+  `).bind(businessId, phoneNumber).first<{ created_at: number }>();
+  const lastInboundAt = latest ? Number(latest.created_at) : null;
+  return {
+    lastInboundAt,
+    canReply: lastInboundAt !== null && now - lastInboundAt <= WHATSAPP_REPLY_WINDOW_MS,
+  };
+}
+
 export async function getChat(businessId: string, phoneNumber: string) {
   return getD1().prepare("SELECT phone_number, user_name, agent_active, updated_at FROM chats WHERE business_id = ? AND phone_number = ?")
     .bind(businessId, phoneNumber).first<StoredChat>();

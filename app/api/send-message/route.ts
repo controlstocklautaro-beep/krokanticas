@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getD1 } from "@/db";
 import { ApiError, apiErrorResponse, businessIdFrom, normalizePhone } from "@/lib/server/api-utils";
 import { requireBusinessAccess } from "@/lib/server/business-context";
-import { getChat, insertMessage, upsertChat } from "@/lib/server/chat-store";
+import { getChat, insertMessage, upsertChat, whatsappReplyWindow } from "@/lib/server/chat-store";
+import { deliverOutboundMessage } from "@/lib/server/outbound-webhook";
 
 export async function POST(req: Request) {
   try {
@@ -14,28 +14,16 @@ export async function POST(req: Request) {
     if (!message) throw new ApiError("Faltan datos", 400);
     if (message.length > 10_000) throw new ApiError("El mensaje es demasiado largo", 413);
 
+    const replyWindow = await whatsappReplyWindow(businessId, phoneNumber);
+    if (!replyWindow.canReply) {
+      throw new ApiError("Pasaron más de 24 horas desde el último mensaje del cliente. Continuá desde WhatsApp.", 409);
+    }
+
     const chat = await getChat(businessId, phoneNumber);
     await upsertChat(businessId, phoneNumber, chat?.user_name ?? phoneNumber);
     await insertMessage({ businessId, phoneNumber, message, sender: "agent", status: "delivered" });
 
-    const integration = await getD1().prepare("SELECT n8n_webhook_url FROM businesses WHERE id = ?")
-      .bind(businessId).first<{ n8n_webhook_url: string | null }>();
-    const webhookUrl = integration?.n8n_webhook_url || process.env.N8N_WEBHOOK_URL;
-    let delivery: "sent" | "failed" | "not_configured" = "not_configured";
-    if (webhookUrl) {
-      try {
-        const response = await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ businessId, phone_number: phoneNumber, message }),
-        });
-        delivery = response.ok ? "sent" : "failed";
-        if (!response.ok) console.error("n8n webhook error", response.status);
-      } catch (error) {
-        delivery = "failed";
-        console.error("n8n webhook unavailable", error);
-      }
-    }
+    const delivery = await deliverOutboundMessage({ businessId, phone_number: phoneNumber, message, type: "text" });
     return NextResponse.json({ success: true, delivery });
   } catch (error) {
     return apiErrorResponse(error, "Error en send-message");

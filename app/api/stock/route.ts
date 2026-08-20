@@ -37,14 +37,27 @@ async function seedCatalog(businessId: string) {
     .bind(crypto.randomUUID(), businessId, name, price, JSON.stringify(aliases), now, now)));
 }
 
-function normalized(body: ProductBody) {
-  const name = body.name?.trim();
-  if (!name) throw new ApiError("Falta name", 400);
-  const price = Number(body.price);
+function normalized(body: Record<string, unknown>) {
+  const name = String(body.name || body.productName || body.product_name || body.variedad || body.sabor || "").trim();
+  if (!name) throw new ApiError("Falta name o nombre del producto", 400);
+  const rawPrice = body.price !== undefined ? body.price : body.precio;
+  const price = rawPrice !== undefined ? Number(rawPrice) : 2600;
   if (!Number.isFinite(price) || price < 0) throw new ApiError("Precio inválido", 400);
-  const status: StockStatus = body.stockStatus === "limited" || body.stockStatus === "soldout" ? body.stockStatus : "available";
-  const quantity = status === "limited" ? Math.max(0, Math.floor(Number(body.stockQuantity ?? 0))) : null;
-  return { name, price, status, quantity, aliases: JSON.stringify(Array.isArray(body.aliases) ? body.aliases.map((alias) => String(alias).trim()).filter(Boolean) : []) };
+  
+  const rawStatus = String(body.stockStatus || body.stock_status || body.status || body.estado || "available").toLowerCase();
+  const status: StockStatus = rawStatus === "limited" || rawStatus === "soldout" ? rawStatus : "available";
+  
+  const rawQty = body.stockQuantity !== undefined ? body.stockQuantity :
+    body.stock_quantity !== undefined ? body.stock_quantity :
+    body.quantity !== undefined ? body.quantity :
+    body.cantidad !== undefined ? body.cantidad : body.stock;
+    
+  const quantity = status === "limited" ? Math.max(0, Math.floor(Number(rawQty ?? 0))) : null;
+  const rawAliases = body.aliases || body.sinonimos || body.alias;
+  const aliases = Array.isArray(rawAliases) ? rawAliases.map((a) => String(a).trim()).filter(Boolean) :
+    typeof rawAliases === "string" ? rawAliases.split(",").map((a) => a.trim()).filter(Boolean) : [];
+
+  return { name, price, status, quantity, aliases: JSON.stringify(aliases) };
 }
 
 export async function GET(req: Request) {
@@ -59,11 +72,12 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as ProductBody;
-    const businessId = businessIdFrom(req, body.businessId);
+    const body = await req.json() as Record<string, unknown>;
+    const businessId = businessIdFrom(req, String(body.businessId || body.business_id || ""));
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager"] });
     const product = normalized(body);
-    const id = crypto.randomUUID(); const now = Date.now();
+    const id = typeof body.id === "string" && body.id ? body.id : crypto.randomUUID(); 
+    const now = Date.now();
     await getD1().prepare("INSERT INTO products (id, business_id, name, price, aliases, active, stock_status, stock_quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)")
       .bind(id, businessId, product.name, product.price, product.aliases, product.status, product.quantity, now, now).run();
     return NextResponse.json({ success: true, id }, { status: 201 });
@@ -72,16 +86,35 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json() as ProductBody;
-    const businessId = businessIdFrom(req, body.businessId);
+    const body = await req.json() as Record<string, unknown>;
+    const businessId = businessIdFrom(req, String(body.businessId || body.business_id || ""));
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager"] });
-    if (!body.id) throw new ApiError("Falta id", 400);
-    const current = await getD1().prepare("SELECT name, price, aliases, active, stock_status, stock_quantity FROM products WHERE id = ? AND business_id = ?").bind(body.id, businessId).first<Record<string, unknown>>();
-    if (!current) throw new ApiError("Variedad no encontrada", 404);
-    const product = normalized({ name: body.name ?? String(current.name), price: body.price ?? Number(current.price), aliases: body.aliases ?? JSON.parse(String(current.aliases)), stockStatus: body.stockStatus ?? current.stock_status as StockStatus, stockQuantity: body.stockQuantity === undefined ? current.stock_quantity as number | null : body.stockQuantity });
-    await getD1().prepare("UPDATE products SET name = ?, price = ?, aliases = ?, active = ?, stock_status = ?, stock_quantity = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-      .bind(product.name, product.price, product.aliases, body.active === undefined ? Number(current.active) : body.active ? 1 : 0, product.status, product.quantity, Date.now(), body.id, businessId).run();
-    return NextResponse.json({ success: true });
+    const id = String(body.id || body.productId || body.product_id || "");
+    const name = String(body.name || body.productName || body.product_name || "").trim();
+    const db = getD1();
+    
+    let current: Record<string, unknown> | null = null;
+    if (id) {
+      current = await db.prepare("SELECT id, name, price, aliases, active, stock_status, stock_quantity FROM products WHERE id = ? AND business_id = ?").bind(id, businessId).first<Record<string, unknown>>();
+    } else if (name) {
+      current = await db.prepare("SELECT id, name, price, aliases, active, stock_status, stock_quantity FROM products WHERE LOWER(name) = LOWER(?) AND business_id = ? AND active = 1").bind(name, businessId).first<Record<string, unknown>>();
+    }
+    
+    if (!current) throw new ApiError("Variedad no encontrada (especificá id o name)", 404);
+    
+    const product = normalized({
+      name: body.name !== undefined ? body.name : current.name,
+      price: body.price !== undefined ? body.price : current.price,
+      aliases: body.aliases !== undefined ? body.aliases : JSON.parse(String(current.aliases || "[]")),
+      stockStatus: body.stockStatus ?? body.stock_status ?? body.status ?? current.stock_status,
+      stockQuantity: (body.stockQuantity !== undefined || body.stock_quantity !== undefined || body.quantity !== undefined || body.cantidad !== undefined) 
+        ? (body.stockQuantity ?? body.stock_quantity ?? body.quantity ?? body.cantidad) 
+        : current.stock_quantity,
+    });
+    
+    await db.prepare("UPDATE products SET name = ?, price = ?, aliases = ?, active = ?, stock_status = ?, stock_quantity = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+      .bind(product.name, product.price, product.aliases, body.active === undefined ? Number(current.active) : body.active ? 1 : 0, product.status, product.quantity, Date.now(), current.id, businessId).run();
+    return NextResponse.json({ success: true, id: current.id, stockStatus: product.status, stockQuantity: product.quantity });
   } catch (error) { return apiErrorResponse(error, "Error actualizando variedad"); }
 }
 

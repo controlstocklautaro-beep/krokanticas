@@ -253,6 +253,7 @@ export const orders = sqliteTable("orders", {
   shippingCost: real("shipping_cost").notNull().default(0),
   total: real("total").notNull(),
   status: text("status").notNull().default("confirmed"),
+  receiptUrl: text("receipt_url"),
   notes: text("notes"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),

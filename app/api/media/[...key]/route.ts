@@ -21,5 +21,21 @@ export async function GET(req: Request) {
   headers.set("etag", object.httpEtag);
   headers.set("Cache-Control", "private, max-age=3600");
   headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Accept-Ranges", "bytes");
+  const range = req.headers.get("range");
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    const total = object.body.size;
+    if (!match) return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${total}` } });
+    const start = match[1] ? Number(match[1]) : 0;
+    const end = match[2] ? Math.min(Number(match[2]), total - 1) : total - 1;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start > end || start >= total) {
+      return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${total}` } });
+    }
+    const partial = object.body.slice(start, end + 1, object.body.type);
+    headers.set("Content-Range", `bytes ${start}-${end}/${total}`);
+    headers.set("Content-Length", String(partial.size));
+    return new Response(partial, { status: 206, headers });
+  }
   return new Response(object.body, { headers });
 }

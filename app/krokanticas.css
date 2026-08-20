@@ -261,6 +261,9 @@
 .k-order-meta { padding:13px 18px; }
 .k-order-meta span { padding:6px 8px; font-size:11px; }
 .k-order-meta strong { font-size:19px; }
+.k-order-receipt { padding:9px 18px; background:#fbf7f0; border-top:1px dashed var(--k-line); display:flex; align-items:center; justify-content:space-between; }
+.k-receipt-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; background:#fff; border:1px solid #d9c4aa; color:#9c4815; font-size:12px; font-weight:700; text-decoration:none; transition:all .15s; }
+.k-receipt-badge:hover { background:#9c4815; color:#fff; border-color:#9c4815; }
 .k-order-note { padding:13px 18px; font-size:13px; }
 .k-order-actions { gap:7px; padding:13px; }
 .k-order-actions button { min-height:40px; padding-inline:12px; font-size:12px; }
@@ -497,10 +500,10 @@
    WHATSAPP WEB EXPERIENCE - KROKANTICAS BRAND THEME
    ============================================================ */
 .k-wa-container { width:100%; height:calc(100vh - 120px); min-height:580px; display:flex; flex-direction:column; }
-.k-wa-layout { flex:1; display:grid; grid-template-columns:360px 1fr; border-radius:14px; border:1px solid var(--k-line); background:#fff; overflow:hidden; box-shadow:0 6px 24px #4a32170c; }
+.k-wa-layout { flex:1; min-height:0; display:grid; grid-template-columns:360px 1fr; border-radius:14px; border:1px solid var(--k-line); background:#fff; overflow:hidden; box-shadow:0 6px 24px #4a32170c; }
 
 /* Sidebar */
-.k-wa-sidebar { display:flex; flex-direction:column; border-right:1px solid var(--k-line); background:#fff; min-width:0; }
+.k-wa-sidebar { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; border-right:1px solid var(--k-line); background:#fff; }
 .k-wa-sidebar-head { height:62px; padding:10px 16px; display:flex; align-items:center; gap:12px; background:var(--k-cream); border-bottom:1px solid var(--k-line); }
 .k-wa-user-avatar { width:38px; height:38px; border-radius:10px; background:linear-gradient(135deg, var(--k-orange-2), var(--k-orange)); color:#fff; display:grid; place-items:center; font-size:17px; box-shadow:0 3px 10px #b854162a; }
 .k-wa-head-title { flex:1; display:flex; flex-direction:column; }
@@ -525,7 +528,30 @@
 .k-chip i { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
 /* Chat List */
-.k-wa-chat-list { flex:1; overflow-y:auto; }
+.k-wa-chat-list { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+.k-wa-chat-list,
+.k-wa-messages-body,
+.k-wa-tag-items,
+.k-wa-quick-grid {
+  scrollbar-width:thin;
+  scrollbar-color:#c78459 transparent;
+}
+.k-wa-chat-list::-webkit-scrollbar,
+.k-wa-messages-body::-webkit-scrollbar,
+.k-wa-tag-items::-webkit-scrollbar,
+.k-wa-quick-grid::-webkit-scrollbar { width:8px; height:8px; }
+.k-wa-chat-list::-webkit-scrollbar-track,
+.k-wa-messages-body::-webkit-scrollbar-track,
+.k-wa-tag-items::-webkit-scrollbar-track,
+.k-wa-quick-grid::-webkit-scrollbar-track { margin:8px 0; border-radius:999px; background:#eadfd166; }
+.k-wa-chat-list::-webkit-scrollbar-thumb,
+.k-wa-messages-body::-webkit-scrollbar-thumb,
+.k-wa-tag-items::-webkit-scrollbar-thumb,
+.k-wa-quick-grid::-webkit-scrollbar-thumb { min-height:38px; border:2px solid transparent; border-radius:999px; background:linear-gradient(#d99a6f,#b86432) padding-box; }
+.k-wa-chat-list::-webkit-scrollbar-thumb:hover,
+.k-wa-messages-body::-webkit-scrollbar-thumb:hover,
+.k-wa-tag-items::-webkit-scrollbar-thumb:hover,
+.k-wa-quick-grid::-webkit-scrollbar-thumb:hover { background:#9f4a1c; }
 .k-wa-chat-item { display:flex; gap:12px; padding:12px 16px; border-bottom:1px solid #f0e7db; cursor:pointer; transition:background .15s; position:relative; }
 .k-wa-chat-item:hover { background:#fcf9f5; }
 .k-wa-chat-item.selected { background:#fff6ef; border-left:3px solid var(--k-orange); }
@@ -548,11 +574,11 @@
 .k-wa-empty-list span { font-size:32px; display:block; margin-bottom:8px; }
 
 /* Ventana de Mensajes (Right Side) */
-.k-wa-window { display:flex; flex-direction:column; min-width:0; background:#fbf8f4; position:relative; }
-.k-wa-header { height:62px; padding:10px 16px; display:flex; align-items:center; gap:12px; background:var(--k-cream); border-bottom:1px solid var(--k-line); z-index:10; }
+.k-wa-window { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; background:#fbf8f4; position:relative; }
+.k-wa-header { height:62px; flex:0 0 auto; padding:10px 16px; display:flex; align-items:center; gap:12px; background:var(--k-cream); border-bottom:1px solid var(--k-line); z-index:10; }
 .k-wa-header-info { flex:1; min-width:0; }
 .k-wa-header-name-row { display:flex; align-items:baseline; gap:8px; }
-.k-wa-header-name-row strong { font-size:15px; color:var(--k-brown); font-family:Georgia,serif; }
+.k-wa-header-name-row strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; color:var(--k-brown); font-family:Georgia,serif; }
 .k-wa-phone { font-size:12px; color:var(--k-muted); }
 .k-wa-header-status { display:flex; align-items:center; gap:6px; margin-top:2px; }
 .k-wa-status-dot { width:7px; height:7px; border-radius:50%; background:#a36a19; }
@@ -586,7 +612,7 @@
 .k-wa-tag-opt .k-check { color:var(--k-orange); }
 
 /* Cuerpo de Mensajes */
-.k-wa-messages-body { flex:1; overflow-y:auto; padding:16px 24px; display:flex; flex-direction:column; gap:10px; background-color:#f6f1e8; background-image:radial-gradient(#b854160d 1px, transparent 1px); background-size:20px 20px; }
+.k-wa-messages-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; overflow-anchor:none; padding:16px 24px; display:flex; flex-direction:column; gap:10px; background-color:#f6f1e8; background-image:radial-gradient(#b854160d 1px, transparent 1px); background-size:20px 20px; }
 .k-wa-bubble-wrap { display:flex; width:100%; }
 .k-wa-bubble-wrap.out { justify-content:flex-end; }
 .k-wa-bubble-wrap.in { justify-content:flex-start; }
@@ -594,8 +620,9 @@
 .bubble-out { background:#fff1e8; color:#2c1c13; border-color:#fad5c3; border-top-right-radius:2px; }
 .bubble-in { background:#ffffff; color:#2c1c13; border-color:#e8ded2; border-top-left-radius:2px; }
 .k-wa-text-msg { white-space:pre-wrap; }
-.k-wa-img-msg { max-width:280px; max-height:260px; border-radius:8px; cursor:pointer; display:block; margin-bottom:4px; }
-.k-wa-audio-msg { max-width:260px; height:36px; display:block; margin-bottom:4px; }
+.k-wa-img-msg { width:auto; height:auto; max-width:280px; max-height:260px; object-fit:contain; border-radius:8px; cursor:pointer; display:block; margin-bottom:4px; }
+.k-wa-bubble.has-audio { width:min(310px,70%); box-sizing:border-box; }
+.k-wa-audio-msg { width:100%; min-width:0; height:44px; display:block; margin-bottom:4px; }
 .k-wa-expired { color:var(--k-muted); font-style:italic; font-size:12px; }
 .k-wa-meta { display:flex; align-items:center; justify-content:flex-end; gap:4px; margin-top:3px; float:right; margin-left:12px; font-size:11px; color:#8e7d73; }
 .k-wa-ticks { color:var(--k-orange); font-size:12px; font-weight:800; }
@@ -610,7 +637,12 @@
 .k-wa-quick-grid button:hover { background:#fff3eb; border-color:var(--k-orange); color:var(--k-orange); }
 
 /* Composer */
-.k-wa-composer { min-height:64px; padding:8px 16px; display:flex; align-items:center; gap:8px; background:var(--k-cream); border-top:1px solid var(--k-line); }
+.k-wa-composer { min-height:64px; flex:0 0 auto; padding:8px 16px; display:flex; align-items:center; gap:8px; background:var(--k-cream); border-top:1px solid var(--k-line); }
+.k-wa-window-expired { width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.k-wa-window-expired > div { min-width:0; display:grid; gap:3px; }
+.k-wa-window-expired strong { color:#7c431c; font-size:12px; }
+.k-wa-window-expired small { color:var(--k-muted); font-size:11px; }
+.k-wa-window-expired button { min-height:40px; flex:0 0 auto; padding:0 15px; border:0; border-radius:9px; color:#fff; background:#1f8f62; font-size:12px; font-weight:750; cursor:pointer; }
 .k-wa-quick-toggle { width:38px; height:38px; border-radius:10px; border:1px solid var(--k-line); background:#fff; font-size:17px; cursor:pointer; color:var(--k-orange); display:grid; place-items:center; }
 .k-wa-quick-toggle.active { background:#fff1e8; border-color:var(--k-orange); }
 .k-wa-attach { width:38px; height:38px; border-radius:10px; border:1px solid var(--k-line); background:#fff; font-size:19px; cursor:pointer; color:var(--k-muted); display:grid; place-items:center; }
@@ -660,11 +692,41 @@
   /* Mostramos el botón de volver en la cabecera */
   .k-wa-back-btn { display:grid; }
   
-  .k-wa-header { padding:8px 12px; gap:8px; }
-  .k-wa-header-actions { gap:4px; }
-  .k-wa-toggle-bot { padding:5px 8px; font-size:10px; }
+  .k-wa-header { height:auto; min-height:62px; padding:8px 10px; gap:7px; }
+  .k-wa-header .k-wa-avatar { width:36px; height:36px; border-radius:10px; }
+  .k-wa-header-info { overflow:hidden; }
+  .k-wa-header-name-row { display:block; }
+  .k-wa-header-name-row strong { display:block; font-family:inherit; font-size:13px; }
+  .k-wa-phone { display:none; }
+  .k-wa-header-status { min-width:0; }
+  .k-wa-header-status small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }
+  .k-wa-header-actions { flex:0 0 auto; gap:4px; }
+  .k-wa-toggle-bot { width:30px; height:30px; padding:0; font-size:0; }
+  .k-wa-header-actions svg { width:16px; height:16px; }
   .k-wa-btn-tag { padding:5px 8px; font-size:10px; }
   .k-wa-btn-ext, .k-wa-btn-del { width:30px; height:30px; }
+  .k-wa-back-btn { width:34px; height:34px; flex:0 0 34px; }
+  .k-wa-messages-body { padding:12px 10px; gap:8px; }
+  .k-wa-bubble { max-width:88%; padding:9px 11px 7px; font-size:14px; }
+  .k-wa-img-msg { max-width:100%; }
+  .k-wa-bubble.has-audio { width:min(290px,88%); max-width:88%; }
+  .k-wa-audio-msg { width:100%; min-width:220px; max-width:100%; height:46px; }
+  .k-wa-composer { padding:8px; gap:6px; }
+  .k-wa-quick-toggle,.k-wa-attach { width:36px; height:36px; flex:0 0 36px; }
+  .k-wa-form { min-width:0; gap:6px; }
+  .k-wa-form input { min-width:0; padding:0 11px; font-size:13px; }
+  .k-wa-send-btn { width:40px; height:40px; }
+  .k-wa-messages-body::-webkit-scrollbar { width:5px; }
+  .k-wa-window-expired { align-items:stretch; flex-direction:column; }
+  .k-wa-window-expired button { width:100%; }
 }
 
-
+@media (max-width:390px) {
+  .k-wa-header { gap:5px; padding-inline:8px; }
+  .k-wa-header .k-wa-avatar { width:32px; height:32px; }
+  .k-wa-header-actions { gap:3px; }
+  .k-wa-toggle-bot,.k-wa-btn-tag,.k-wa-btn-ext,.k-wa-btn-del { width:28px; height:28px; padding:0; }
+  .k-wa-header-status small { font-size:9px; }
+  .k-wa-bubble.has-audio { width:92%; max-width:92%; }
+  .k-wa-audio-msg { min-width:0; }
+}

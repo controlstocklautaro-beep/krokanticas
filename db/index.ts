@@ -180,6 +180,12 @@ class SupabaseMediaBucket {
     return new SupabaseMediaObject(data);
   }
 
+  async signedUrl(path: string, expiresIn = 60 * 60): Promise<string> {
+    const { data, error } = await this.bucket.createSignedUrl(path, expiresIn);
+    if (error || !data?.signedUrl) throw new Error(`No se pudo generar el enlace del archivo: ${error?.message ?? "sin URL"}`);
+    return data.signedUrl;
+  }
+
   async head(path: string): Promise<{ key: string } | null> {
     const separator = path.lastIndexOf("/");
     const folder = separator >= 0 ? path.slice(0, separator) : "";

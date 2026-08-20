@@ -75,8 +75,9 @@ export async function ensureSchema(): Promise<void> {
   }
   try {
     await db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS address TEXT").run();
-  } catch {
-    // Ignorar si ya existe
-  }
+  } catch {}
+  try {
+    await db.prepare("ALTER TABLE orders ADD COLUMN IF NOT EXISTS receipt_url TEXT").run();
+  } catch {}
   schemaReady = true;
 }
