@@ -750,6 +750,7 @@ Acceso: n8n. Solo después de la confirmación explícita.
   "paymentMethod": "transfer",
   "scheduledTime": "21:30",
   "shippingCost": 4000,
+  "receipt_url": "https://storage.ejemplo.com/comprobantes/pago-27.jpg",
   "notes": "Llamar al llegar",
   "items": [
     { "productId": "uuid-producto", "quantity": 6 }
@@ -767,7 +768,10 @@ Reglas del servidor:
 - calcula subtotal y total usando el precio del servidor;
 - para retiro fuerza `shippingCost=0`;
 - descuenta stock limitado;
+- guarda la URL del comprobante en `receipt_url`;
 - crea la comanda con estado `confirmed`.
+
+Para el comprobante, el nombre recomendado desde n8n es `receipt_url`. Por compatibilidad también se aceptan `receiptUrl`, `comprobante`, `comprobante_url`, `comprobanteUrl`, `url_comprobante`, `comprobante_transferencia`, `payment_receipt_url` y `proof_url`. Debe ser una URL completa `http://` o `https://`.
 
 Respuesta `201`:
 
@@ -779,7 +783,9 @@ Respuesta `201`:
     "orderNumber": 27,
     "subtotal": 15600,
     "shippingCost": 4000,
-    "total": 19600
+    "total": 19600,
+    "receiptUrl": "https://storage.ejemplo.com/comprobantes/pago-27.jpg",
+    "receipt_url": "https://storage.ejemplo.com/comprobantes/pago-27.jpg"
   }
 }
 ```
@@ -799,6 +805,7 @@ Acceso: n8n. También acepta `POST` por compatibilidad.
   "paymentMethod": "cash",
   "scheduledTime": "21:45",
   "shippingCost": 4000,
+  "receipt_url": "https://storage.ejemplo.com/comprobantes/pago-27-corregido.jpg",
   "notes": "Sin aceitunas",
   "items": [
     { "productId": "uuid-producto", "quantity": 8 }
@@ -823,7 +830,9 @@ Respuesta:
     "id": "uuid-comanda",
     "status": "in_kitchen",
     "subtotal": 20800,
-    "total": 24800
+    "total": 24800,
+    "receiptUrl": "https://storage.ejemplo.com/comprobantes/pago-27-corregido.jpg",
+    "receipt_url": "https://storage.ejemplo.com/comprobantes/pago-27-corregido.jpg"
   }
 }
 ```

@@ -61,7 +61,7 @@ También se admite `delta: -2` o `delta: 3`. Nunca se permite que la cantidad qu
 ## Cocina y comandas
 
 - `GET /api/kitchen/orders?businessId=krokanticas`: lista comandas con sus productos.
-- `POST /api/kitchen/create`: crea una comanda confirmada.
+- `POST /api/kitchen/create`: crea una comanda confirmada y acepta la URL del comprobante en `receipt_url`.
 - `PATCH /api/kitchen/edit`: edita datos, estado y productos.
 - `DELETE /api/kitchen/delete`: elimina una comanda y devuelve el stock limitado descontado.
 

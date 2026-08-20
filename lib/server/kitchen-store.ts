@@ -39,7 +39,19 @@ type OrderInput = {
   receiptUrl?: string;
   receipt_url?: string;
   receipt?: string;
+  comprobante?: string;
+  comprobanteUrl?: string;
   comprobante_url?: string;
+  urlComprobante?: string;
+  url_comprobante?: string;
+  comprobanteTransferencia?: string;
+  comprobante_transferencia?: string;
+  url_comprobante_transferencia?: string;
+  paymentReceiptUrl?: string;
+  payment_receipt_url?: string;
+  paymentProofUrl?: string;
+  payment_proof_url?: string;
+  proofUrl?: string;
   proof_url?: string;
   items?: OrderItemInput[];
 };
@@ -56,6 +68,49 @@ export async function listKitchenOrders(businessId: string, status?: string | nu
 
 function normalizeText(text: string): string {
   return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+const RECEIPT_KEYS = [
+  "receiptUrl", "receipt_url", "receipt", "receiptLink", "receipt_link",
+  "comprobante", "comprobanteUrl", "comprobante_url", "urlComprobante", "url_comprobante",
+  "comprobanteTransferencia", "comprobante_transferencia", "url_comprobante_transferencia",
+  "comprobantePago", "comprobante_pago", "comprobantePagoUrl", "comprobante_pago_url",
+  "urlComprobantePago", "url_comprobante_pago", "paymentReceipt", "payment_receipt",
+  "paymentReceiptUrl", "payment_receipt_url", "paymentProof", "payment_proof",
+  "paymentProofUrl", "payment_proof_url", "proofUrl", "proof_url", "proof",
+] as const;
+
+function receiptString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) return value.length ? receiptString(value[0]) : "";
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "link", "href", "value", "src"]) {
+      const candidate = receiptString(record[key]);
+      if (candidate) return candidate;
+    }
+  }
+  return "";
+}
+
+function receiptFromBody(body: Record<string, unknown>, fallback: string | null = null) {
+  for (const key of RECEIPT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(body, key)) continue;
+    const value = receiptString(body[key]);
+    if (!value) return { provided: true, url: null };
+    if (value.length > 2_048) throw new ApiError("La URL del comprobante es demasiado larga", 400);
+    let parsed: URL;
+    try {
+      parsed = new URL(value);
+    } catch {
+      throw new ApiError("La URL del comprobante no es válida", 400);
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new ApiError("La URL del comprobante debe comenzar con http:// o https://", 400);
+    }
+    return { provided: true, url: parsed.toString() };
+  }
+  return { provided: false, url: fallback };
 }
 
 export async function createKitchenOrder(businessId: string, rawBody: OrderInput | Record<string, unknown>) {
@@ -176,7 +231,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   const scheduledTime = (body.scheduledTime || body.scheduled_time || "Ahora").trim();
   const zone = (body.zone || body.zona || "").trim() || null;
   const notes = (body.notes || "").trim() || null;
-  const receiptUrl = (body.receiptUrl || body.receipt_url || body.receipt || body.comprobante_url || body.proof_url || "").trim() || null;
+  const receiptUrl = receiptFromBody(rawBody as Record<string, unknown>).url;
 
   const numberRow = await db.prepare("SELECT COALESCE(MAX(order_number), 0) + 1 AS next_number FROM orders WHERE business_id = ?").bind(businessId).first<{ next_number: number }>();
   const orderNumber = Number(numberRow?.next_number ?? 1);
@@ -213,6 +268,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     shippingCost,
     total: subtotal + shippingCost,
     receiptUrl,
+    receipt_url: receiptUrl,
     items: preparedItems.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.price, subtotal: i.subtotal })),
   };
 }
@@ -229,7 +285,7 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
   const rawShipping = body.shippingCost !== undefined ? body.shippingCost : body.shipping_cost;
   const requestedShippingCost = rawShipping === undefined ? Number(current.shipping_cost) : Math.max(0, Number(rawShipping));
   const shippingCost = deliveryType === "delivery" ? requestedShippingCost : 0;
-  const receiptUrl = body.receiptUrl !== undefined ? String(body.receiptUrl || "").trim() || null : body.receipt_url !== undefined ? String(body.receipt_url || "").trim() || null : current.receipt_url as string | null;
+  const receiptUrl = receiptFromBody(body, current.receipt_url as string | null).url;
   const now = Date.now();
   let subtotal = Number(current.subtotal);
   const statements = [];
@@ -282,7 +338,7 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
   statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ?, status = ?, receipt_url = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
     .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" || body.payment_method === "transfer" ? "transfer" : body.paymentMethod === "cash" || body.payment_method === "cash" ? "cash" : current.payment_method, body.scheduledTime === undefined ? current.scheduled_time : String(body.scheduledTime || body.scheduled_time || "Ahora"), subtotal, shippingCost, total, status, receiptUrl, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
   await db.batch(statements);
-  return { id, status, subtotal, total, receiptUrl };
+  return { id, status, subtotal, total, receiptUrl, receipt_url: receiptUrl };
 }
 
 export async function deleteKitchenOrder(businessId: string, id: string) {
