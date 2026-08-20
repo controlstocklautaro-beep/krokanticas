@@ -563,6 +563,8 @@ Respuesta:
       "active": 1,
       "stock_status": "limited",
       "stock_quantity": 18,
+      "made_to_order": true,
+      "requires_human": true,
       "updated_at": 1760000000000
     }
   ]
@@ -574,6 +576,22 @@ Estados:
 - `available`: disponible sin cantidad limitada; `stock_quantity` es `null`;
 - `limited`: cantidad exacta disponible;
 - `soldout`: agotado.
+
+`made_to_order` y `requires_human` expresan la misma decisión operativa. Si cualquiera es `true`, n8n debe detener el flujo automático para ese pedido, no confirmar ni crear la comanda y ejecutar `POST /api/handoffs` para que una persona continúe la conversación.
+
+Ejemplo de derivación obligatoria por producto encargado:
+
+```json
+{
+  "businessId": "krokanticas",
+  "contactId": "uuid-contacto",
+  "phoneNumber": "+5493410000000",
+  "customerName": "Nombre del cliente",
+  "reason": "other",
+  "summary": "Producto por encargo solicitado: Jamón y queso. Continuar el pedido manualmente.",
+  "priority": "medium"
+}
+```
 
 ### 6.12 `POST /api/stock`
 
@@ -588,7 +606,8 @@ Acceso: n8n, aunque normalmente se administra desde el panel.
   "aliases": ["nuevo", "nv"],
   "active": true,
   "stockStatus": "limited",
-  "stockQuantity": 20
+  "stockQuantity": 20,
+  "madeToOrder": true
 }
 ```
 
@@ -611,9 +630,12 @@ Acceso: n8n. Requiere `id`. Si se cambia a `available` o `soldout`, la cantidad 
   "price": 2800,
   "aliases": ["jamón", "jyq"],
   "stockStatus": "soldout",
+  "madeToOrder": true,
   "active": true
 }
 ```
+
+También se aceptan los alias `made_to_order`, `porEncargo` y `por_encargo`. La respuesta incluye `made_to_order` y `requires_human`.
 
 ### 6.14 `POST /api/stock/adjust`
 

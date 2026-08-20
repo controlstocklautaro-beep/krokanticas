@@ -231,6 +231,7 @@ export const products = sqliteTable("products", {
   active: integer("active", { mode: "boolean" }).notNull().default(1),
   stockStatus: text("stock_status").notNull().default("available"),
   stockQuantity: integer("stock_quantity"),
+  madeToOrder: integer("made_to_order", { mode: "boolean" }).notNull().default(0),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, (table) => [

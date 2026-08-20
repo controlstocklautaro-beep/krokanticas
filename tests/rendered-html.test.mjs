@@ -44,6 +44,8 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(panel, /\/api\/businesses/);
   assert.match(panel, /function StockModule/);
   assert.match(panel, /name="description"/);
+  assert.match(panel, /Por encargo/);
+  assert.match(panel, /name="madeToOrder"/);
   assert.match(panel, /setEditStockStatus\(Number\(value\) > 0 \? "limited" : "soldout"\)/);
   assert.match(panel, /Cambios guardados\. Quedan/);
   assert.match(panel, /function KitchenModule/);
@@ -166,6 +168,8 @@ test("includes persistent operational APIs and migrations", async () => {
   const mediaRoute = await readFile(new URL("app/api/media/[...key]/route.ts", root), "utf8");
   assert.match(stock, /stock_status/);
   assert.match(stock, /description/);
+  assert.match(stock, /made_to_order/);
+  assert.match(stock, /requires_human/);
   assert.match(adjust, /Stock insuficiente/);
   assert.match(messageList, /ORDER BY created_at DESC LIMIT 500/);
   assert.match(messageList, /mediaProxyUrl/);
@@ -183,6 +187,10 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.ok(productDescriptionMigrationName, "Missing products description migration");
   const productDescriptionMigration = await readFile(new URL(`supabase/migrations/${productDescriptionMigrationName}`, root), "utf8");
   assert.match(productDescriptionMigration, /ADD COLUMN IF NOT EXISTS "description" text/);
+  const madeToOrderMigrationName = migrationNames.find((name) => name.includes("add_products_made_to_order"));
+  assert.ok(madeToOrderMigrationName, "Missing products made_to_order migration");
+  const madeToOrderMigration = await readFile(new URL(`supabase/migrations/${madeToOrderMigrationName}`, root), "utf8");
+  assert.match(madeToOrderMigration, /ADD COLUMN IF NOT EXISTS "made_to_order" bigint/);
   assert.match(migration, /CREATE TABLE "orders"/);
   assert.match(migration, /"address" text/);
   assert.match(migration, /CREATE TABLE "handoffs"/);

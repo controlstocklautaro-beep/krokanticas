@@ -39,13 +39,23 @@ Las contraseñas se almacenan con PBKDF2-SHA256 y sal aleatoria; las sesiones y 
 
 ## Stock y catálogo
 
-- `GET /api/stock?businessId=krokanticas`: consulta variedades, descripción, precios, sinónimos y stock.
-- `POST /api/stock`: crea una variedad con descripción breve opcional.
-- `PATCH /api/stock`: edita nombre, descripción, precio, sinónimos y estado.
+- `GET /api/stock?businessId=krokanticas`: consulta variedades, descripción, precios, sinónimos, stock y las banderas `made_to_order`/`requires_human`.
+- `POST /api/stock`: crea una variedad con descripción breve opcional y admite `madeToOrder`.
+- `PATCH /api/stock`: edita nombre, descripción, precio, sinónimos, estado y `madeToOrder`.
 - `DELETE /api/stock`: desactiva una variedad.
 - `POST /api/stock/adjust`: suma o descuenta stock limitado.
 
 Estados permitidos: `available`, `limited`, `soldout`.
+
+Si `GET /api/stock` devuelve `requires_human: true`, n8n debe detener el pedido automático y llamar a `POST /api/handoffs` con el contacto, `reason: "other"` y un resumen que identifique el producto por encargo. No debe llamar a `/api/kitchen/create` hasta que una persona resuelva el caso.
+
+```json
+{
+  "businessId": "krokanticas",
+  "id": "uuid-producto",
+  "madeToOrder": true
+}
+```
 
 ```json
 {

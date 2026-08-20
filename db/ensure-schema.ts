@@ -37,7 +37,7 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS pipeline_leads_business_column_idx ON pipeline_leads (business_id, column_id)`,
   `CREATE INDEX IF NOT EXISTS pipeline_leads_business_created_idx ON pipeline_leads (business_id, created_at)`,
   `CREATE TABLE IF NOT EXISTS business_settings (business_id TEXT PRIMARY KEY NOT NULL, store_open INTEGER NOT NULL DEFAULT 1, delay_minutes INTEGER NOT NULL DEFAULT 30, courier_active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL)`,
-  `CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, price REAL NOT NULL, aliases TEXT NOT NULL DEFAULT '[]', active INTEGER NOT NULL DEFAULT 1, stock_status TEXT NOT NULL DEFAULT 'available', stock_quantity INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, price REAL NOT NULL, aliases TEXT NOT NULL DEFAULT '[]', active INTEGER NOT NULL DEFAULT 1, stock_status TEXT NOT NULL DEFAULT 'available', stock_quantity INTEGER, made_to_order INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS products_business_name_uq ON products (business_id, name)`,
   `CREATE INDEX IF NOT EXISTS products_business_status_idx ON products (business_id, stock_status)`,
   `CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, contact_id TEXT NOT NULL, order_number INTEGER NOT NULL, customer_name TEXT NOT NULL, phone_number TEXT NOT NULL, delivery_type TEXT NOT NULL, address TEXT, zone TEXT, payment_method TEXT NOT NULL, scheduled_time TEXT NOT NULL, subtotal REAL NOT NULL, shipping_cost REAL NOT NULL DEFAULT 0, total REAL NOT NULL, status TEXT NOT NULL DEFAULT 'confirmed', receipt_url TEXT, notes TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`,
@@ -80,5 +80,6 @@ export async function ensureSchema(): Promise<void> {
   await db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS address TEXT").run();
   await db.prepare("ALTER TABLE orders ADD COLUMN IF NOT EXISTS receipt_url TEXT").run();
   await db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT").run();
+  await db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS made_to_order BIGINT NOT NULL DEFAULT 0").run();
   schemaReady = true;
 }

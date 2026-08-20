@@ -25,7 +25,7 @@ import { UsersModule } from "./components/UsersModule";
 type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "settings" | "users";
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Business = { id: string; name: string; modules: string[] };
-type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null };
+type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null; made_to_order: boolean; requires_human?: boolean };
 type Contact = { id: string; name: string; phone_number: string; address?: string | null };
 type OrderItem = { id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number };
 type Order = { id: string; contact_id: string; order_number: number; customer_name: string; phone_number: string; delivery_type: "pickup" | "delivery"; address?: string | null; zone?: string | null; payment_method: "cash" | "transfer"; scheduled_time: string; subtotal: number; shipping_cost: number; total: number; status: "confirmed" | "in_kitchen" | "ready" | "delivered" | "cancelled"; receipt_url?: string | null; notes?: string | null; created_at: number; items: OrderItem[] };
@@ -264,6 +264,7 @@ function StockModule({ businessId }: { businessId: string }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
 
   function openEditor(product: Product) {
     setEditing(product);
@@ -297,6 +298,30 @@ function StockModule({ businessId }: { businessId: string }) {
     }
   }
 
+  async function toggleMadeToOrder(product: Product) {
+    const nextValue = !product.made_to_order;
+    setUpdatingProductId(product.id);
+    setError("");
+    setNotice("");
+    try {
+      await api("/api/stock", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId, id: product.id, madeToOrder: nextValue }),
+      });
+      setProducts((current) => current.map((item) => item.id === product.id
+        ? { ...item, made_to_order: nextValue, requires_human: nextValue }
+        : item));
+      setNotice(nextValue
+        ? `${product.name} quedó marcado como Por encargo y la API indicará derivación humana.`
+        : `${product.name} volvió al flujo automático de pedidos.`);
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : "No se pudo cambiar Por encargo");
+    } finally {
+      setUpdatingProductId(null);
+    }
+  }
+
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -319,6 +344,7 @@ function StockModule({ businessId }: { businessId: string }) {
             .filter(Boolean),
           stockStatus: status,
           stockQuantity: status === "limited" ? Number(form.get("quantity")) : null,
+          madeToOrder: form.get("madeToOrder") === "on",
           active: true,
         }),
       });
@@ -358,6 +384,7 @@ function StockModule({ businessId }: { businessId: string }) {
             .filter(Boolean),
           stockStatus: status,
           stockQuantity: status === "limited" ? quantity : null,
+          madeToOrder: form.get("madeToOrder") === "on",
           active: true,
         }),
       });
@@ -437,6 +464,23 @@ function StockModule({ businessId }: { businessId: string }) {
                 Sinónimos: {product.aliases.join(", ")}
               </small>
             )}
+            <label className={`k-made-to-order ${product.made_to_order ? "active" : ""}`}>
+              <span className="k-made-to-order-copy">
+                <HandHelping size={18} aria-hidden />
+                <span>
+                  <b>Por encargo</b>
+                  <small>{product.made_to_order ? "Derivar a atención humana" : "Pedido automático habilitado"}</small>
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(product.made_to_order)}
+                disabled={updatingProductId === product.id}
+                onChange={() => void toggleMadeToOrder(product)}
+                aria-label={`Por encargo para ${product.name}`}
+              />
+              <i className="k-switch-track" aria-hidden />
+            </label>
             <div className="k-stock-bottom">
               {product.stock_status === "limited" ? (
                 <div className="k-stepper">
@@ -495,6 +539,11 @@ function StockModule({ businessId }: { businessId: string }) {
             <label>
               Sinónimos y abreviaturas para el bot de IA (separados por coma)
               <textarea name="aliases" placeholder="Ej: jyq, jamon queso, jamon y muzza" />
+            </label>
+            <label className="k-made-to-order k-made-to-order-form">
+              <span className="k-made-to-order-copy"><HandHelping size={18} aria-hidden /><span><b>Por encargo</b><small>Si se activa, n8n debe derivar el pedido a una persona.</small></span></span>
+              <input type="checkbox" name="madeToOrder" />
+              <i className="k-switch-track" aria-hidden />
             </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={() => setCreating(false)}>Cancelar</button>
@@ -567,6 +616,11 @@ function StockModule({ businessId }: { businessId: string }) {
               Sinónimos separados por coma (para el bot de WhatsApp)
               <textarea name="aliases" defaultValue={editing.aliases.join(", ")} />
             </label>
+            <label className="k-made-to-order k-made-to-order-form">
+              <span className="k-made-to-order-copy"><HandHelping size={18} aria-hidden /><span><b>Por encargo</b><small>La API devolverá que este producto requiere atención humana.</small></span></span>
+              <input type="checkbox" name="madeToOrder" defaultChecked={Boolean(editing.made_to_order)} />
+              <i className="k-switch-track" aria-hidden />
+            </label>
             <div className="modal-actions" style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
               <button
                 type="button"
@@ -634,7 +688,7 @@ function HandoffsModule({ businessId }: { businessId: string }) {
 }
 
 function ProductPicker({ products, items, onChange, includeSoldout = false }: { products: Product[]; items: Record<string, number>; onChange: (items: Record<string, number>) => void; includeSoldout?: boolean }) {
-  return <fieldset className="k-product-picker"><legend>Productos</legend>{products.filter((product) => includeSoldout || product.stock_status !== "soldout").map((product) => { const quantity = items[product.id] || 0; return <div className={product.stock_status === "soldout" ? "soldout" : ""} key={product.id}><span><strong>{product.name}</strong>{product.description && <em className="k-picker-description">{product.description}</em>}<small>{money(product.price)}{product.stock_status === "limited" ? ` · quedan ${product.stock_quantity}` : product.stock_status === "soldout" ? " · agotada" : ""}</small></span><div className="k-stepper"><button type="button" onClick={() => onChange({ ...items, [product.id]: Math.max(0, quantity - 1) })}>−</button><b>{quantity}</b><button type="button" disabled={product.stock_status === "soldout" && quantity === 0} onClick={() => onChange({ ...items, [product.id]: quantity + 1 })}>＋</button></div></div>; })}</fieldset>;
+  return <fieldset className="k-product-picker"><legend>Productos</legend>{products.filter((product) => includeSoldout || product.stock_status !== "soldout").map((product) => { const quantity = items[product.id] || 0; return <div className={product.stock_status === "soldout" ? "soldout" : ""} key={product.id}><span><strong>{product.name}</strong>{product.description && <em className="k-picker-description">{product.description}</em>}{product.made_to_order && <em className="k-picker-human">Por encargo · requiere atención humana</em>}<small>{money(product.price)}{product.stock_status === "limited" ? ` · quedan ${product.stock_quantity}` : product.stock_status === "soldout" ? " · agotada" : ""}</small></span><div className="k-stepper"><button type="button" onClick={() => onChange({ ...items, [product.id]: Math.max(0, quantity - 1) })}>−</button><b>{quantity}</b><button type="button" disabled={product.stock_status === "soldout" && quantity === 0} onClick={() => onChange({ ...items, [product.id]: quantity + 1 })}>＋</button></div></div>; })}</fieldset>;
 }
 
 function KitchenModule({ businessId }: { businessId: string }) {

@@ -4,7 +4,7 @@ import { ApiError, apiErrorResponse, businessIdFrom } from "@/lib/server/api-uti
 import { requireBusinessAccess } from "@/lib/server/business-context";
 
 type StockStatus = "available" | "limited" | "soldout";
-type ProductBody = { businessId?: string; id?: string; name?: string; description?: string; price?: number; aliases?: string[]; active?: boolean; stockStatus?: StockStatus; stockQuantity?: number | null };
+type ProductBody = { businessId?: string; id?: string; name?: string; description?: string; price?: number; aliases?: string[]; active?: boolean; stockStatus?: StockStatus; stockQuantity?: number | null; madeToOrder?: boolean };
 
 const catalog = [
   ["Jamón y queso", 2600, ["jamón", "jyq", "jamón queso"]],
@@ -58,8 +58,10 @@ function normalized(body: Record<string, unknown>) {
   const rawAliases = body.aliases || body.sinonimos || body.alias;
   const aliases = Array.isArray(rawAliases) ? rawAliases.map((a) => String(a).trim()).filter(Boolean) :
     typeof rawAliases === "string" ? rawAliases.split(",").map((a) => a.trim()).filter(Boolean) : [];
+  const rawMadeToOrder = body.madeToOrder ?? body.made_to_order ?? body.porEncargo ?? body.por_encargo ?? body.soloPorEncargo ?? body.solo_por_encargo ?? false;
+  const madeToOrder = typeof rawMadeToOrder === "boolean" ? rawMadeToOrder : ["1", "true", "yes", "si", "sí", "on"].includes(String(rawMadeToOrder).trim().toLowerCase());
 
-  return { name, description: description || null, price, status, quantity, aliases: JSON.stringify(aliases) };
+  return { name, description: description || null, price, status, quantity, aliases: JSON.stringify(aliases), madeToOrder };
 }
 
 export async function GET(req: Request) {
@@ -67,8 +69,8 @@ export async function GET(req: Request) {
     const businessId = businessIdFrom(req);
     await requireBusinessAccess(req, businessId, { allowIntegration: true });
     await seedCatalog(businessId);
-    const result = await getD1().prepare("SELECT id, name, description, price, aliases, active, stock_status, stock_quantity, updated_at FROM products WHERE business_id = ? AND active = 1 ORDER BY name ASC").bind(businessId).all();
-    return NextResponse.json({ products: result.results.map((row) => ({ ...row, aliases: JSON.parse(String(row.aliases || "[]")) })) });
+    const result = await getD1().prepare("SELECT id, name, description, price, aliases, active, stock_status, stock_quantity, made_to_order, updated_at FROM products WHERE business_id = ? AND active = 1 ORDER BY name ASC").bind(businessId).all();
+    return NextResponse.json({ products: result.results.map((row) => ({ ...row, aliases: JSON.parse(String(row.aliases || "[]")), made_to_order: Boolean(row.made_to_order), requires_human: Boolean(row.made_to_order) })) });
   } catch (error) { return apiErrorResponse(error, "Error consultando stock"); }
 }
 
@@ -80,9 +82,9 @@ export async function POST(req: Request) {
     const product = normalized(body);
     const id = typeof body.id === "string" && body.id ? body.id : crypto.randomUUID(); 
     const now = Date.now();
-    await getD1().prepare("INSERT INTO products (id, business_id, name, description, price, aliases, active, stock_status, stock_quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)")
-      .bind(id, businessId, product.name, product.description, product.price, product.aliases, product.status, product.quantity, now, now).run();
-    return NextResponse.json({ success: true, id, description: product.description }, { status: 201 });
+    await getD1().prepare("INSERT INTO products (id, business_id, name, description, price, aliases, active, stock_status, stock_quantity, made_to_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)")
+      .bind(id, businessId, product.name, product.description, product.price, product.aliases, product.status, product.quantity, product.madeToOrder ? 1 : 0, now, now).run();
+    return NextResponse.json({ success: true, id, description: product.description, made_to_order: product.madeToOrder, requires_human: product.madeToOrder }, { status: 201 });
   } catch (error) { return apiErrorResponse(error, "Error creando variedad"); }
 }
 
@@ -97,9 +99,9 @@ export async function PATCH(req: Request) {
     
     let current: Record<string, unknown> | null = null;
     if (id) {
-      current = await db.prepare("SELECT id, name, description, price, aliases, active, stock_status, stock_quantity FROM products WHERE id = ? AND business_id = ?").bind(id, businessId).first<Record<string, unknown>>();
+      current = await db.prepare("SELECT id, name, description, price, aliases, active, stock_status, stock_quantity, made_to_order FROM products WHERE id = ? AND business_id = ?").bind(id, businessId).first<Record<string, unknown>>();
     } else if (name) {
-      current = await db.prepare("SELECT id, name, description, price, aliases, active, stock_status, stock_quantity FROM products WHERE LOWER(name) = LOWER(?) AND business_id = ? AND active = 1").bind(name, businessId).first<Record<string, unknown>>();
+      current = await db.prepare("SELECT id, name, description, price, aliases, active, stock_status, stock_quantity, made_to_order FROM products WHERE LOWER(name) = LOWER(?) AND business_id = ? AND active = 1").bind(name, businessId).first<Record<string, unknown>>();
     }
     
     if (!current) throw new ApiError("Variedad no encontrada (especificá id o name)", 404);
@@ -113,11 +115,12 @@ export async function PATCH(req: Request) {
       stockQuantity: (body.stockQuantity !== undefined || body.stock_quantity !== undefined || body.quantity !== undefined || body.cantidad !== undefined) 
         ? (body.stockQuantity ?? body.stock_quantity ?? body.quantity ?? body.cantidad) 
         : current.stock_quantity,
+      madeToOrder: body.madeToOrder ?? body.made_to_order ?? body.porEncargo ?? body.por_encargo ?? current.made_to_order,
     });
     
-    await db.prepare("UPDATE products SET name = ?, description = ?, price = ?, aliases = ?, active = ?, stock_status = ?, stock_quantity = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-      .bind(product.name, product.description, product.price, product.aliases, body.active === undefined ? Number(current.active) : body.active ? 1 : 0, product.status, product.quantity, Date.now(), current.id, businessId).run();
-    return NextResponse.json({ success: true, id: current.id, description: product.description, stockStatus: product.status, stockQuantity: product.quantity });
+    await db.prepare("UPDATE products SET name = ?, description = ?, price = ?, aliases = ?, active = ?, stock_status = ?, stock_quantity = ?, made_to_order = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+      .bind(product.name, product.description, product.price, product.aliases, body.active === undefined ? Number(current.active) : body.active ? 1 : 0, product.status, product.quantity, product.madeToOrder ? 1 : 0, Date.now(), current.id, businessId).run();
+    return NextResponse.json({ success: true, id: current.id, description: product.description, stockStatus: product.status, stockQuantity: product.quantity, made_to_order: product.madeToOrder, requires_human: product.madeToOrder });
   } catch (error) { return apiErrorResponse(error, "Error actualizando variedad"); }
 }
 
