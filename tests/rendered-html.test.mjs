@@ -43,6 +43,9 @@ test("defines the authenticated Krokanticas operations panel", async () => {
   assert.match(panel, /CustomersModule businessId=\{business\.id\}/);
   assert.match(panel, /\/api\/businesses/);
   assert.match(panel, /function StockModule/);
+  assert.match(panel, /name="description"/);
+  assert.match(panel, /setEditStockStatus\(Number\(value\) > 0 \? "limited" : "soldout"\)/);
+  assert.match(panel, /Cambios guardados\. Quedan/);
   assert.match(panel, /function KitchenModule/);
   assert.match(panel, /function HandoffsModule/);
   assert.doesNotMatch(panel, /WhatsApp pendiente/);
@@ -125,6 +128,13 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.match(migration, /CREATE TABLE "tags"/);
   assert.match(migration, /CREATE TABLE "transactions"/);
   assert.match(migration, /CREATE TABLE "business_modules"/);
+  const receiptMigrationName = migrationNames.find((name) => name.includes("add_orders_receipt_url"));
+  assert.ok(receiptMigrationName, "Missing receipt_url migration");
+  const receiptMigration = await readFile(new URL(`supabase/migrations/${receiptMigrationName}`, root), "utf8");
+  assert.match(receiptMigration, /ADD COLUMN IF NOT EXISTS "receipt_url" text/);
+  const ensureSchema = await readFile(new URL("db/ensure-schema.ts", root), "utf8");
+  assert.match(ensureSchema, /ALTER TABLE orders ADD COLUMN IF NOT EXISTS receipt_url TEXT/);
+  assert.doesNotMatch(ensureSchema, /SELECT 1 FROM app_users LIMIT 1[\s\S]{0,120}return/);
 
   for (const endpoint of ["create", "edit", "delete", "orders"]) {
     const source = await readFile(new URL(`app/api/kitchen/${endpoint}/route.ts`, root), "utf8");
@@ -151,6 +161,7 @@ test("includes persistent operational APIs and migrations", async () => {
   const chatStore = await readFile(new URL("lib/server/chat-store.ts", root), "utf8");
   const mediaRoute = await readFile(new URL("app/api/media/[...key]/route.ts", root), "utf8");
   assert.match(stock, /stock_status/);
+  assert.match(stock, /description/);
   assert.match(adjust, /Stock insuficiente/);
   assert.match(messageList, /ORDER BY created_at DESC LIMIT 500/);
   assert.match(messageList, /mediaProxyUrl/);
@@ -164,6 +175,10 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.match(mediaRoute, /status: 206/);
   assert.match(contacts, /searchParams\.get\("phone_number"\)/);
   assert.match(migration, /CREATE TABLE "products"/);
+  const productDescriptionMigrationName = migrationNames.find((name) => name.includes("add_products_description"));
+  assert.ok(productDescriptionMigrationName, "Missing products description migration");
+  const productDescriptionMigration = await readFile(new URL(`supabase/migrations/${productDescriptionMigrationName}`, root), "utf8");
+  assert.match(productDescriptionMigration, /ADD COLUMN IF NOT EXISTS "description" text/);
   assert.match(migration, /CREATE TABLE "orders"/);
   assert.match(migration, /"address" text/);
   assert.match(migration, /CREATE TABLE "handoffs"/);

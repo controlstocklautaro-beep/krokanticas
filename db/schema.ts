@@ -225,6 +225,7 @@ export const products = sqliteTable("products", {
   id: text("id").primaryKey(),
   businessId: text("business_id").notNull(),
   name: text("name").notNull(),
+  description: text("description"),
   price: real("price").notNull(),
   aliases: text("aliases").notNull().default("[]"),
   active: integer("active", { mode: "boolean" }).notNull().default(1),

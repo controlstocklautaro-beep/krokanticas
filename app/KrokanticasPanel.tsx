@@ -25,7 +25,7 @@ import { UsersModule } from "./components/UsersModule";
 type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "settings" | "users";
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Business = { id: string; name: string; modules: string[] };
-type Product = { id: string; name: string; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null };
+type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null };
 type Contact = { id: string; name: string; phone_number: string; address?: string | null };
 type OrderItem = { id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number };
 type Order = { id: string; contact_id: string; order_number: number; customer_name: string; phone_number: string; delivery_type: "pickup" | "delivery"; address?: string | null; zone?: string | null; payment_method: "cash" | "transfer"; scheduled_time: string; subtotal: number; shipping_cost: number; total: number; status: "confirmed" | "in_kitchen" | "ready" | "delivered" | "cancelled"; receipt_url?: string | null; notes?: string | null; created_at: number; items: OrderItem[] };
@@ -257,9 +257,21 @@ function StockModule({ businessId }: { businessId: string }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createStockStatus, setCreateStockStatus] = useState<Product["stock_status"]>("available");
   const [editing, setEditing] = useState<Product | null>(null);
+  const [editStockStatus, setEditStockStatus] = useState<Product["stock_status"]>("available");
+  const [editStockQuantity, setEditStockQuantity] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+
+  function openEditor(product: Product) {
+    setEditing(product);
+    setEditStockStatus(product.stock_status);
+    setEditStockQuantity(product.stock_quantity === null ? "" : String(product.stock_quantity));
+    setError("");
+    setNotice("");
+  }
 
   async function reload() {
     const data = await api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`);
@@ -289,7 +301,9 @@ function StockModule({ businessId }: { businessId: string }) {
     event.preventDefault();
     setBusy(true);
     const form = new FormData(event.currentTarget);
-    const status = String(form.get("status"));
+    const status = createStockStatus;
+    setError("");
+    setNotice("");
     try {
       await api("/api/stock", {
         method: "POST",
@@ -297,6 +311,7 @@ function StockModule({ businessId }: { businessId: string }) {
         body: JSON.stringify({
           businessId,
           name: form.get("name"),
+          description: form.get("description"),
           price: Number(form.get("price")),
           aliases: String(form.get("aliases") || "")
             .split(",")
@@ -308,7 +323,9 @@ function StockModule({ businessId }: { businessId: string }) {
         }),
       });
       setCreating(false);
+      setCreateStockStatus("available");
       await reload();
+      setNotice("Variedad creada y stock guardado correctamente.");
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "No se pudo crear el producto");
     } finally {
@@ -321,7 +338,10 @@ function StockModule({ businessId }: { businessId: string }) {
     if (!editing) return;
     setBusy(true);
     const form = new FormData(event.currentTarget);
-    const status = String(form.get("status"));
+    const status = editStockStatus;
+    const quantity = Math.max(0, Math.floor(Number(editStockQuantity || 0)));
+    setError("");
+    setNotice("");
     try {
       await api("/api/stock", {
         method: "PATCH",
@@ -330,18 +350,24 @@ function StockModule({ businessId }: { businessId: string }) {
           businessId,
           id: editing.id,
           name: form.get("name"),
+          description: form.get("description"),
           price: Number(form.get("price")),
           aliases: String(form.get("aliases") || "")
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean),
           stockStatus: status,
-          stockQuantity: status === "limited" ? Number(form.get("quantity")) : null,
+          stockQuantity: status === "limited" ? quantity : null,
           active: true,
         }),
       });
       setEditing(null);
       await reload();
+      setNotice(status === "available"
+        ? "Cambios guardados. La variedad quedó disponible sin límite."
+        : status === "soldout"
+          ? "Cambios guardados. La variedad quedó agotada."
+          : `Cambios guardados. Quedan ${quantity} unidades.`);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
     } finally {
@@ -392,6 +418,7 @@ function StockModule({ businessId }: { businessId: string }) {
       </div>
 
       {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
+      {notice && <div className="k-success-banner" role="status">{notice}</div>}
 
       <div className="k-stock-grid">
         {filtered.map((product) => (
@@ -403,7 +430,8 @@ function StockModule({ businessId }: { businessId: string }) {
               </b>
             </div>
             <h2>{product.name}</h2>
-            <p>{money(product.price)} por unidad</p>
+            <p className="k-stock-price">{money(product.price)} por unidad</p>
+            {product.description && <p className="k-product-description">{product.description}</p>}
             {product.aliases && product.aliases.length > 0 && (
               <small style={{ color: "var(--k-muted)", fontSize: "11px", display: "block", marginBottom: "8px" }}>
                 Sinónimos: {product.aliases.join(", ")}
@@ -420,7 +448,7 @@ function StockModule({ businessId }: { businessId: string }) {
                 <small>{product.stock_status === "available" ? "Disponible sin límite" : "No acepta pedidos"}</small>
               )}
               <div style={{ display: "flex", gap: "6px", marginLeft: "auto" }}>
-                <button className="k-edit" onClick={() => setEditing(product)}>Editar</button>
+                <button className="k-edit" onClick={() => openEditor(product)}>Editar</button>
               </div>
             </div>
           </article>
@@ -442,6 +470,10 @@ function StockModule({ businessId }: { businessId: string }) {
               Nombre del sabor / producto
               <input name="name" placeholder="Ej: Jamón y muzzarella especial" required autoFocus />
             </label>
+            <label>
+              Descripción breve
+              <input name="description" maxLength={500} placeholder="Ej: Jamón cocido, muzzarella y un toque de orégano" />
+            </label>
             <div className="form-grid">
               <label>
                 Precio unitario ($)
@@ -449,7 +481,7 @@ function StockModule({ businessId }: { businessId: string }) {
               </label>
               <label>
                 Estado inicial
-                <select name="status" defaultValue="available">
+                <select name="status" value={createStockStatus} onChange={(event) => setCreateStockStatus(event.target.value as Product["stock_status"])}>
                   <option value="available">Disponible</option>
                   <option value="limited">Poco stock (con límite)</option>
                   <option value="soldout">Agotada</option>
@@ -458,7 +490,7 @@ function StockModule({ businessId }: { businessId: string }) {
             </div>
             <label>
               Cantidad inicial (si tiene poco stock)
-              <input name="quantity" type="number" min="0" defaultValue="10" />
+              <input name="quantity" type="number" min="0" defaultValue="10" disabled={createStockStatus !== "limited"} />
             </label>
             <label>
               Sinónimos y abreviaturas para el bot de IA (separados por coma)
@@ -487,6 +519,10 @@ function StockModule({ businessId }: { businessId: string }) {
               Nombre
               <input name="name" defaultValue={editing.name} required />
             </label>
+            <label>
+              Descripción breve
+              <input name="description" maxLength={500} defaultValue={editing.description || ""} placeholder="Ingredientes o detalle de la variedad" />
+            </label>
             <div className="form-grid">
               <label>
                 Precio ($)
@@ -494,7 +530,17 @@ function StockModule({ businessId }: { businessId: string }) {
               </label>
               <label>
                 Estado
-                <select name="status" defaultValue={editing.stock_status}>
+                <select
+                  name="status"
+                  value={editStockStatus}
+                  onChange={(event) => {
+                    const nextStatus = event.target.value as Product["stock_status"];
+                    setEditStockStatus(nextStatus);
+                    if (nextStatus === "available") setEditStockQuantity("");
+                    if (nextStatus === "soldout") setEditStockQuantity("0");
+                    if (nextStatus === "limited" && !editStockQuantity) setEditStockQuantity("1");
+                  }}
+                >
                   <option value="available">Disponible</option>
                   <option value="limited">Poco stock</option>
                   <option value="soldout">Agotada</option>
@@ -503,7 +549,19 @@ function StockModule({ businessId }: { businessId: string }) {
             </div>
             <label>
               Cantidad restante
-              <input name="quantity" type="number" min="0" defaultValue={editing.stock_quantity ?? 0} />
+              <small>{editStockStatus === "available" ? "Escribí una cantidad para pasar automáticamente a Poco stock." : "El estado se actualiza automáticamente según la cantidad."}</small>
+              <input
+                name="quantity"
+                type="number"
+                min="0"
+                value={editStockQuantity}
+                placeholder={editStockStatus === "available" ? "Sin límite" : "0"}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setEditStockQuantity(value);
+                  if (value !== "") setEditStockStatus(Number(value) > 0 ? "limited" : "soldout");
+                }}
+              />
             </label>
             <label>
               Sinónimos separados por coma (para el bot de WhatsApp)
@@ -576,7 +634,7 @@ function HandoffsModule({ businessId }: { businessId: string }) {
 }
 
 function ProductPicker({ products, items, onChange, includeSoldout = false }: { products: Product[]; items: Record<string, number>; onChange: (items: Record<string, number>) => void; includeSoldout?: boolean }) {
-  return <fieldset className="k-product-picker"><legend>Productos</legend>{products.filter((product) => includeSoldout || product.stock_status !== "soldout").map((product) => { const quantity = items[product.id] || 0; return <div className={product.stock_status === "soldout" ? "soldout" : ""} key={product.id}><span><strong>{product.name}</strong><small>{money(product.price)}{product.stock_status === "limited" ? ` · quedan ${product.stock_quantity}` : product.stock_status === "soldout" ? " · agotada" : ""}</small></span><div className="k-stepper"><button type="button" onClick={() => onChange({ ...items, [product.id]: Math.max(0, quantity - 1) })}>−</button><b>{quantity}</b><button type="button" disabled={product.stock_status === "soldout" && quantity === 0} onClick={() => onChange({ ...items, [product.id]: quantity + 1 })}>＋</button></div></div>; })}</fieldset>;
+  return <fieldset className="k-product-picker"><legend>Productos</legend>{products.filter((product) => includeSoldout || product.stock_status !== "soldout").map((product) => { const quantity = items[product.id] || 0; return <div className={product.stock_status === "soldout" ? "soldout" : ""} key={product.id}><span><strong>{product.name}</strong>{product.description && <em className="k-picker-description">{product.description}</em>}<small>{money(product.price)}{product.stock_status === "limited" ? ` · quedan ${product.stock_quantity}` : product.stock_status === "soldout" ? " · agotada" : ""}</small></span><div className="k-stepper"><button type="button" onClick={() => onChange({ ...items, [product.id]: Math.max(0, quantity - 1) })}>−</button><b>{quantity}</b><button type="button" disabled={product.stock_status === "soldout" && quantity === 0} onClick={() => onChange({ ...items, [product.id]: quantity + 1 })}>＋</button></div></div>; })}</fieldset>;
 }
 
 function KitchenModule({ businessId }: { businessId: string }) {

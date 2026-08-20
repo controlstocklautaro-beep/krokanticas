@@ -39,9 +39,9 @@ Las contraseñas se almacenan con PBKDF2-SHA256 y sal aleatoria; las sesiones y 
 
 ## Stock y catálogo
 
-- `GET /api/stock?businessId=krokanticas`: consulta variedades, precios, sinónimos y stock.
-- `POST /api/stock`: crea una variedad.
-- `PATCH /api/stock`: edita nombre, precio, sinónimos y estado.
+- `GET /api/stock?businessId=krokanticas`: consulta variedades, descripción, precios, sinónimos y stock.
+- `POST /api/stock`: crea una variedad con descripción breve opcional.
+- `PATCH /api/stock`: edita nombre, descripción, precio, sinónimos y estado.
 - `DELETE /api/stock`: desactiva una variedad.
 - `POST /api/stock/adjust`: suma o descuenta stock limitado.
 

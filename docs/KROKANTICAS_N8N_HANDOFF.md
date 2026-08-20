@@ -557,6 +557,7 @@ Respuesta:
     {
       "id": "uuid-producto",
       "name": "Jamón y queso",
+      "description": "Jamón cocido, muzzarella y un toque de orégano",
       "price": 2600,
       "aliases": ["jamón", "jyq", "jamón queso"],
       "active": 1,
@@ -582,6 +583,7 @@ Acceso: n8n, aunque normalmente se administra desde el panel.
 {
   "businessId": "krokanticas",
   "name": "Nueva variedad",
+  "description": "Descripción breve de los ingredientes o del producto",
   "price": 3000,
   "aliases": ["nuevo", "nv"],
   "active": true,
@@ -605,6 +607,7 @@ Acceso: n8n. Requiere `id`. Si se cambia a `available` o `soldout`, la cantidad 
   "businessId": "krokanticas",
   "id": "uuid-producto",
   "name": "Jamón y queso",
+  "description": "Jamón cocido y muzzarella",
   "price": 2800,
   "aliases": ["jamón", "jyq"],
   "stockStatus": "soldout",
