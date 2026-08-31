@@ -979,13 +979,15 @@
 
 .k-audio-wrap {
   position: relative;
+  flex: 0 0 auto;
 }
 
 .k-audio-btn {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 36px;
+  min-height: 38px;
+  height: 38px;
   padding: 0 12px;
   border: 1px solid var(--k-line);
   border-radius: 9px;
@@ -995,6 +997,13 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.k-audio-btn-short {
+  display: none;
 }
 
 .k-audio-btn:hover {
@@ -1013,12 +1022,13 @@
   top: calc(100% + 8px);
   right: 0;
   width: 290px;
+  max-width: calc(100vw - 24px);
   padding: 16px;
   border-radius: 12px;
   background: #ffffff;
   border: 1px solid var(--k-line);
   box-shadow: 0 16px 40px rgba(45, 33, 27, 0.18);
-  z-index: 60;
+  z-index: 90;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -1130,3 +1140,143 @@
 .k-order-card.is-new {
   animation: k-order-pulse 1.6s ease-in-out 3;
 }
+
+/* ==========================================================================
+   Ajustes de Adaptabilidad Global (Móvil, Tablet, Monitor)
+   ========================================================================== */
+
+/* Monitores Grandes y Pantallas Ultra-Wide */
+@media (min-width: 1400px) {
+  .k-order-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+  .k-stock-grid {
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  }
+  .k-overview-grid {
+    grid-template-columns: 1.4fr 1fr;
+  }
+}
+
+/* Tablets (pantalla intermedia) */
+@media (max-width: 1050px) {
+  .k-topbar {
+    padding: 0 20px;
+  }
+  .k-content {
+    padding: 24px 20px 50px;
+  }
+  .k-stock-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .k-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tablets en vertical y Móviles Grandes */
+@media (max-width: 780px) {
+  .k-top-actions {
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .k-audio-btn {
+    min-height: 36px;
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
+    font-size: 11px;
+  }
+  .k-audio-btn-label {
+    display: none;
+  }
+  .k-audio-btn-short {
+    display: inline;
+  }
+  .k-install {
+    min-height: 36px;
+    height: 36px;
+    padding: 0 10px;
+    font-size: 11px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* Móviles (hasta 480px) */
+@media (max-width: 480px) {
+  .k-topbar {
+    height: 58px;
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .k-topbar > div:first-of-type {
+    margin-left: 6px;
+    max-width: 115px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .k-topbar > div:first-of-type span,
+  .k-topbar > div:first-of-type b {
+    display: none;
+  }
+  .k-topbar > div:first-of-type strong {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .k-top-actions {
+    gap: 6px;
+    margin-left: auto;
+  }
+  .k-audio-btn {
+    width: 36px;
+    min-height: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 9px;
+  }
+  .k-audio-btn-label,
+  .k-audio-btn-short {
+    display: none;
+  }
+  .k-top-actions .k-install {
+    height: 36px;
+    min-height: 36px;
+    padding: 0 9px;
+    font-size: 10px;
+  }
+  .k-audio-popover {
+    position: fixed;
+    top: calc(58px + env(safe-area-inset-top) + 6px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: calc(100vw - 16px);
+  }
+  .k-toast-container {
+    top: calc(58px + env(safe-area-inset-top) + 6px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-width: 100%;
+  }
+  .k-heading h1 {
+    font-size: 26px;
+  }
+  .k-tabs {
+    gap: 4px;
+  }
+  .k-tabs button {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 10px;
+  }
+  .k-order-items > div {
+    font-size: 11px;
+  }
+}
+

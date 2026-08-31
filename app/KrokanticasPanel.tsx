@@ -111,10 +111,29 @@ function AudioControl() {
   const [open, setOpen] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const [notifGranted, setNotifGranted] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSoundOn(isSoundEnabled());
     setNotifGranted(canSendDesktopNotifications());
+
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   function toggleSound() {
@@ -130,7 +149,7 @@ function AudioControl() {
   }
 
   return (
-    <div className="k-audio-wrap">
+    <div className="k-audio-wrap" ref={wrapRef}>
       <button
         type="button"
         className={`k-audio-btn ${!soundOn ? "muted" : ""}`}
@@ -139,9 +158,11 @@ function AudioControl() {
           setOpen((prev) => !prev);
         }}
         title="Configurar alertas y sonidos"
+        aria-label="Configurar alertas y sonidos"
       >
-        {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
-        <span>{soundOn ? "Alertas activas" : "Silenciado"}</span>
+        {soundOn ? <Volume2 size={16} aria-hidden /> : <VolumeX size={16} aria-hidden />}
+        <span className="k-audio-btn-label">{soundOn ? "Alertas activas" : "Silenciado"}</span>
+        <span className="k-audio-btn-short">{soundOn ? "Alertas" : "Mute"}</span>
       </button>
 
       {open && (
@@ -152,6 +173,7 @@ function AudioControl() {
               type="button"
               className="k-toast-close"
               onClick={() => setOpen(false)}
+              aria-label="Cerrar panel"
             >
               ×
             </button>
