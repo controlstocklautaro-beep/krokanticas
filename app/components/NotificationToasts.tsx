@@ -9,6 +9,7 @@ export type ToastItem = {
   title: string;
   subtitle: string;
   meta?: string;
+  badgeText?: string;
   actionLabel?: string;
   onAction?: () => void;
   createdAt: number;
@@ -72,7 +73,12 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         <div className="k-toast-header">
           <div className="k-toast-badge-wrap">
             <span className={`k-toast-badge ${isKitchen ? "kitchen" : "whatsapp"}`}>
-              {isKitchen ? "🍳 PEDIDO A COCINA" : "💬 WHATSAPP BUSINESS"}
+              {isKitchen ? (
+                <ChefHat size={13} aria-hidden />
+              ) : (
+                <MessageCircle size={13} aria-hidden />
+              )}
+              <span>{toast.badgeText || (isKitchen ? "Pedido a Cocina" : "WhatsApp Business")}</span>
             </span>
             <span className="k-toast-time">• Ahora</span>
           </div>
@@ -105,7 +111,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
                 onDismiss();
               }}
             >
-              <span>{toast.actionLabel || (isKitchen ? "Ver Cocina" : "Ver Conversación")}</span>
+              <span>{toast.actionLabel || (isKitchen ? "Ver en Cocina" : "Abrir Conversación")}</span>
               <ArrowRight size={14} aria-hidden />
             </button>
           </div>

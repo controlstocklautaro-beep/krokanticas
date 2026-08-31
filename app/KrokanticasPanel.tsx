@@ -291,19 +291,20 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
                   ? order.items.map((it) => `${it.quantity}× ${it.product_name}`).join(", ")
                   : "Nuevo pedido ingresado";
               const deliveryTypeStr =
-                order.delivery_type === "delivery" ? "🛵 Envío a domicilio" : "🏬 Retiro por el local";
+                order.delivery_type === "delivery" ? "Envío a domicilio" : "Retiro por el local";
 
               addToast({
                 type: "kitchen",
+                badgeText: "Pedido a Cocina",
                 title: `Comanda #${orderNum} · ${order.customer_name}`,
                 subtitle: itemsDesc,
                 meta: `${deliveryTypeStr} · ${money(order.total)}`,
-                actionLabel: "Ver Cocina →",
+                actionLabel: "Ver en Cocina",
                 onAction: () => choose("kitchen"),
               });
 
               sendDesktopNotification({
-                title: `🍳 ¡Nueva Comanda #${orderNum}!`,
+                title: `Nueva Comanda #${orderNum}`,
                 body: `${order.customer_name} (${deliveryTypeStr}) - Total: ${money(order.total)}`,
                 onClick: () => {
                   choose("kitchen");
@@ -356,15 +357,16 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
 
                 addToast({
                   type: "whatsapp",
+                  badgeText: "WhatsApp Cliente",
                   title: chat.user_name || chat.phone_number,
                   subtitle: chat.last_message,
                   meta: `WhatsApp · ${chat.phone_number}`,
-                  actionLabel: "Ver Conversación →",
+                  actionLabel: "Abrir Conversación",
                   onAction: () => choose("messages"),
                 });
 
                 sendDesktopNotification({
-                  title: `💬 ${chat.user_name || chat.phone_number}`,
+                  title: `Mensaje de ${chat.user_name || chat.phone_number}`,
                   body: chat.last_message,
                   onClick: () => {
                     choose("messages");
