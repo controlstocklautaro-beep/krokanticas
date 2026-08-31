@@ -161,14 +161,14 @@ function AudioControl() {
         aria-label="Configurar alertas y sonidos"
       >
         {soundOn ? <Volume2 size={16} aria-hidden /> : <VolumeX size={16} aria-hidden />}
-        <span className="k-audio-btn-label">{soundOn ? "Alertas activas" : "Silenciado"}</span>
-        <span className="k-audio-btn-short">{soundOn ? "Alertas" : "Mute"}</span>
+        <span className="k-audio-btn-label">{soundOn ? "Campana Cocina" : "Silenciado"}</span>
+        <span className="k-audio-btn-short">{soundOn ? "Cocina" : "Mute"}</span>
       </button>
 
       {open && (
         <div className="k-audio-popover" onMouseDown={(e) => e.stopPropagation()}>
           <div className="k-audio-popover-head">
-            <strong>Sonidos y Notificaciones</strong>
+            <strong>Alertas de Cocina</strong>
             <button
               type="button"
               className="k-toast-close"
@@ -180,18 +180,18 @@ function AudioControl() {
           </div>
 
           <div className="k-audio-toggle-row">
-            <span>Alertas sonoras</span>
+            <span>Sonido de comanda</span>
             <button
               type="button"
               className={`k-wa-toggle-bot ${soundOn ? "active" : ""}`}
               onClick={toggleSound}
             >
-              {soundOn ? "ACTIVADAS" : "SILENCIADAS"}
+              {soundOn ? "ACTIVADA" : "SILENCIADA"}
             </button>
           </div>
 
           <div className="k-audio-test-section">
-            <span className="k-audio-test-label">PROBAR SONIDOS</span>
+            <span className="k-audio-test-label">PROBAR ALERTA</span>
             <button
               type="button"
               className="k-audio-test-btn"
@@ -200,19 +200,8 @@ function AudioControl() {
                 playKitchenOrderSound();
               }}
             >
-              <span>🍳 Campana Cocina</span>
+              <span>🍳 Campana de Cocina</span>
               <small>Fuerte</small>
-            </button>
-            <button
-              type="button"
-              className="k-audio-test-btn"
-              onClick={() => {
-                unlockAudio();
-                playChatMessageSound();
-              }}
-            >
-              <span>💬 Mensaje WhatsApp</span>
-              <small>Suave</small>
             </button>
           </div>
 
@@ -239,8 +228,6 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const seenOrderIds = useRef<Set<string>>(new Set());
   const initialOrdersLoaded = useRef(false);
-  const lastChatUpdate = useRef<number>(0);
-  const initialChatsLoaded = useRef(false);
 
   const name = user.displayName.includes("@") ? `Equipo ${business.name}` : user.displayName;
   const visibleSections = sections.filter((section) => {
@@ -259,7 +246,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
     setToasts((current) => current.filter((item) => item.id !== id));
   };
 
-  // Sincronización en tiempo real en segundo plano (Cocina y WhatsApp)
+  // Sincronización en tiempo real en segundo plano (Exclusiva para Comandas de Cocina)
   useEffect(() => {
     let activeSync = true;
 
@@ -318,77 +305,11 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
       }
     }
 
-    async function checkChats() {
-      try {
-        const data = await api<{
-          chats: {
-            phone_number: string;
-            user_name: string;
-            updated_at: number;
-            last_message?: string;
-            last_sender?: "user" | "agent";
-            last_message_at?: number;
-          }[];
-        }>(`/api/chats?businessId=${encodeURIComponent(business.id)}`);
-        if (!activeSync) return;
-
-        if (!initialChatsLoaded.current) {
-          const maxTime = data.chats.reduce(
-            (max, chat) => Math.max(max, chat.last_message_at || chat.updated_at || 0),
-            0
-          );
-          lastChatUpdate.current = maxTime || Date.now();
-          initialChatsLoaded.current = true;
-        } else {
-          // Detectar mensajes con timestamp mayor al último conocido
-          const updatedChats = data.chats.filter(
-            (chat) => (chat.last_message_at || chat.updated_at) > lastChatUpdate.current
-          );
-          if (updatedChats.length > 0) {
-            let highestTimestamp = lastChatUpdate.current;
-            for (const chat of updatedChats) {
-              const msgTime = chat.last_message_at || chat.updated_at;
-              if (msgTime > highestTimestamp) highestTimestamp = msgTime;
-
-              // SOLO notificar y hacer sonar para mensajes ENTRANTES del cliente (sender === 'user')
-              // Nunca para mensajes que enviamos nosotros o el bot (sender === 'agent')
-              if (chat.last_message && chat.last_sender === "user") {
-                playChatMessageSound();
-
-                addToast({
-                  type: "whatsapp",
-                  badgeText: "WhatsApp Cliente",
-                  title: chat.user_name || chat.phone_number,
-                  subtitle: chat.last_message,
-                  meta: `WhatsApp · ${chat.phone_number}`,
-                  actionLabel: "Abrir Conversación",
-                  onAction: () => choose("messages"),
-                });
-
-                sendDesktopNotification({
-                  title: `Mensaje de ${chat.user_name || chat.phone_number}`,
-                  body: chat.last_message,
-                  onClick: () => {
-                    choose("messages");
-                  },
-                });
-              }
-            }
-            lastChatUpdate.current = highestTimestamp;
-          }
-        }
-      } catch {
-        // Silencioso en segundo plano
-      }
-    }
-
     void checkKitchenOrders();
-    void checkChats();
 
-    // Sincronización continua cada 2.5 segundos
+    // Sincronización continua de cocina cada 2.5 segundos
     const timer = setInterval(() => {
       void checkKitchenOrders();
-      void checkChats();
     }, 2500);
 
     return () => {
