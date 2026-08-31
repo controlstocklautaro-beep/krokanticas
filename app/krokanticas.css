@@ -780,3 +780,353 @@
   .k-wa-bubble.has-audio { width:92%; max-width:92%; }
   .k-wa-audio-msg { min-width:0; }
 }
+
+/* ==========================================================================
+   Toasts y Notificaciones en Tiempo Real (Cocina & WhatsApp)
+   ========================================================================== */
+
+.k-toast-container {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.k-toast {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 36px rgba(45, 33, 27, 0.18), 0 2px 8px rgba(45, 33, 27, 0.08);
+  border: 1px solid var(--k-line);
+  animation: k-toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes k-toast-slide-in {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.k-toast-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+}
+
+.k-toast-kitchen {
+  border-color: #f7d2be;
+  border-left: 5px solid var(--k-orange);
+}
+
+.k-toast-kitchen .k-toast-icon {
+  background: #fdf0e8;
+  color: var(--k-orange);
+}
+
+.k-toast-whatsapp {
+  border-color: #c9ebd9;
+  border-left: 5px solid #25D366;
+}
+
+.k-toast-whatsapp .k-toast-icon {
+  background: #eafaf1;
+  color: #128c7e;
+}
+
+.k-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.k-toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.k-toast-type {
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.k-toast-kitchen .k-toast-type {
+  color: var(--k-orange);
+}
+
+.k-toast-whatsapp .k-toast-type {
+  color: #128c7e;
+}
+
+.k-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--k-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.k-toast-close:hover {
+  background: #f0e7db;
+  color: var(--k-brown);
+}
+
+.k-toast-title {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--k-brown);
+  font-family: Georgia, serif;
+}
+
+.k-toast-subtitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #5d5047;
+  line-height: 1.4;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.k-toast-meta {
+  font-size: 11px;
+  color: var(--k-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.k-toast-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 750;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.15s;
+}
+
+.k-toast-kitchen .k-toast-action-btn {
+  background: linear-gradient(135deg, var(--k-orange-2), var(--k-orange));
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(184, 84, 22, 0.25);
+}
+
+.k-toast-whatsapp .k-toast-action-btn {
+  background: #25D366;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+}
+
+.k-toast-action-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.k-toast-progress-track {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #f0e7db;
+}
+
+.k-toast-kitchen .k-toast-progress-bar {
+  height: 100%;
+  background: var(--k-orange);
+  transition: width 0.05s linear;
+}
+
+.k-toast-whatsapp .k-toast-progress-bar {
+  height: 100%;
+  background: #25D366;
+  transition: width 0.05s linear;
+}
+
+/* ==========================================================================
+   Controles de Audio y Notificaciones en Barra Superior
+   ========================================================================== */
+
+.k-audio-wrap {
+  position: relative;
+}
+
+.k-audio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--k-line);
+  border-radius: 9px;
+  background: #ffffff;
+  color: var(--k-brown);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.k-audio-btn:hover {
+  background: #fdfaf6;
+  border-color: var(--k-orange);
+}
+
+.k-audio-btn.muted {
+  color: #9c4b37;
+  background: #fff5f3;
+  border-color: #f4d7cf;
+}
+
+.k-audio-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 290px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--k-line);
+  box-shadow: 0 16px 40px rgba(45, 33, 27, 0.18);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.k-audio-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0e7db;
+}
+
+.k-audio-popover-head strong {
+  font-size: 13px;
+  color: var(--k-brown);
+  font-family: Georgia, serif;
+}
+
+.k-audio-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.k-audio-toggle-row span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--k-brown);
+}
+
+.k-audio-test-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.k-audio-test-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--k-muted);
+}
+
+.k-audio-test-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--k-line);
+  background: #faf7f2;
+  color: var(--k-brown);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.k-audio-test-btn:hover {
+  background: #f4ecdf;
+  border-color: var(--k-orange);
+  color: var(--k-orange);
+}
+
+.k-audio-notif-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--k-line);
+  background: #fdfaf6;
+  color: var(--k-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s;
+}
+
+.k-audio-notif-btn.active {
+  background: #eafaf1;
+  border-color: #25D366;
+  color: #128c7e;
+  border-style: solid;
+}
+
+.k-audio-notif-btn:hover {
+  border-color: var(--k-orange);
+  color: var(--k-orange);
+}
+
+/* Efecto de pulso en comandas recién llegadas */
+@keyframes k-order-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(211, 106, 34, 0.45);
+    border-color: var(--k-orange);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(211, 106, 34, 0);
+    border-color: var(--k-orange);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(211, 106, 34, 0);
+  }
+}
+
+.k-order-card.is-new {
+  animation: k-order-pulse 1.6s ease-in-out 3;
+}

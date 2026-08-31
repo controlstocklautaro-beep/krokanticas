@@ -150,7 +150,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
       setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
     }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
     void refresh();
-    const timer = window.setInterval(refresh, 6_000);
+    const timer = window.setInterval(refresh, 2_500);
     return () => { active = false; window.clearInterval(timer); };
   }, [businessId]);
 
@@ -165,7 +165,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
       })
       .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar mensajes"));
     void refresh();
-    const timer = window.setInterval(refresh, 4_000);
+    const timer = window.setInterval(refresh, 2_000);
     return () => { active = false; window.clearInterval(timer); };
   }, [businessId, selectedPhone]);
 

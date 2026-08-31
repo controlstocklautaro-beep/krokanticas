@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Bell,
   Boxes,
   ChefHat,
   ContactRound,
@@ -16,11 +17,24 @@ import {
   Settings as SettingsIcon,
   Trash2,
   UsersRound,
+  Volume2,
+  VolumeX,
   type LucideIcon,
 } from "lucide-react";
 import { CustomersModule, MessagesModule } from "./components/OperationalModules";
+import { NotificationToasts, type ToastItem } from "./components/NotificationToasts";
 import { PwaInstall } from "./components/PwaInstall";
 import { UsersModule } from "./components/UsersModule";
+import {
+  canSendDesktopNotifications,
+  isSoundEnabled,
+  playChatMessageSound,
+  playKitchenOrderSound,
+  requestNotificationPermission,
+  sendDesktopNotification,
+  setSoundEnabled,
+  unlockAudio,
+} from "@/lib/client/sound-and-notifications";
 
 type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "settings" | "users";
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
@@ -93,9 +107,119 @@ function BusinessSwitcher({ activeBusiness }: { activeBusiness: Business }) {
   return <label className="k-business-switcher"><span>EMPRESA</span><select value={activeBusiness.id} disabled={busy} onChange={(event) => void change(event.target.value)}>{businesses.map((business) => <option value={business.id} key={business.id}>{business.name}</option>)}</select></label>;
 }
 
+function AudioControl() {
+  const [open, setOpen] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  const [notifGranted, setNotifGranted] = useState(false);
+
+  useEffect(() => {
+    setSoundOn(isSoundEnabled());
+    setNotifGranted(canSendDesktopNotifications());
+  }, []);
+
+  function toggleSound() {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+    if (next) unlockAudio();
+  }
+
+  async function requestNotif() {
+    const res = await requestNotificationPermission();
+    setNotifGranted(res === "granted");
+  }
+
+  return (
+    <div className="k-audio-wrap">
+      <button
+        type="button"
+        className={`k-audio-btn ${!soundOn ? "muted" : ""}`}
+        onClick={() => {
+          unlockAudio();
+          setOpen((prev) => !prev);
+        }}
+        title="Configurar alertas y sonidos"
+      >
+        {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+        <span>{soundOn ? "Alertas activas" : "Silenciado"}</span>
+      </button>
+
+      {open && (
+        <div className="k-audio-popover" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="k-audio-popover-head">
+            <strong>Sonidos y Notificaciones</strong>
+            <button
+              type="button"
+              className="k-toast-close"
+              onClick={() => setOpen(false)}
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="k-audio-toggle-row">
+            <span>Alertas sonoras</span>
+            <button
+              type="button"
+              className={`k-wa-toggle-bot ${soundOn ? "active" : ""}`}
+              onClick={toggleSound}
+            >
+              {soundOn ? "ACTIVADAS" : "SILENCIADAS"}
+            </button>
+          </div>
+
+          <div className="k-audio-test-section">
+            <span className="k-audio-test-label">PROBAR SONIDOS</span>
+            <button
+              type="button"
+              className="k-audio-test-btn"
+              onClick={() => {
+                unlockAudio();
+                playKitchenOrderSound();
+              }}
+            >
+              <span>🍳 Campana Cocina</span>
+              <small>Fuerte</small>
+            </button>
+            <button
+              type="button"
+              className="k-audio-test-btn"
+              onClick={() => {
+                unlockAudio();
+                playChatMessageSound();
+              }}
+            >
+              <span>💬 Mensaje WhatsApp</span>
+              <small>Suave</small>
+            </button>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              className={`k-audio-notif-btn ${notifGranted ? "active" : ""}`}
+              onClick={requestNotif}
+            >
+              {notifGranted
+                ? "✓ Notificaciones de escritorio activas"
+                : "🔔 Activar notificaciones del navegador"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function KrokanticasPanel({ user, business }: { user: { id: string; displayName: string; email: string; role: UserRole }; business: Business }) {
   const [active, setActive] = useState<Section>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const seenOrderIds = useRef<Set<string>>(new Set());
+  const initialOrdersLoaded = useRef(false);
+  const lastChatUpdate = useRef<number>(0);
+  const initialChatsLoaded = useRef(false);
+
   const name = user.displayName.includes("@") ? `Equipo ${business.name}` : user.displayName;
   const visibleSections = sections.filter((section) => {
     if (section.id === "overview") return true;
@@ -104,7 +228,137 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
   });
   const choose = (section: Section) => { setActive(section); setMobileOpen(false); };
 
+  const addToast = (toast: Omit<ToastItem, "id" | "createdAt">) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    setToasts((current) => [...current.slice(-4), { ...toast, id, createdAt: Date.now() }]);
+  };
+
+  const dismissToast = (id: string) => {
+    setToasts((current) => current.filter((item) => item.id !== id));
+  };
+
+  // Sincronización en tiempo real en segundo plano (Cocina y WhatsApp)
+  useEffect(() => {
+    let activeSync = true;
+
+    async function checkKitchenOrders() {
+      try {
+        const data = await api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${encodeURIComponent(business.id)}`);
+        if (!activeSync) return;
+
+        if (!initialOrdersLoaded.current) {
+          // Primera carga: registrar órdenes existentes sin alertar
+          for (const order of data.orders) {
+            seenOrderIds.current.add(order.id);
+          }
+          initialOrdersLoaded.current = true;
+        } else {
+          // Detección de órdenes nuevas
+          const newOrders = data.orders.filter(
+            (order) => !seenOrderIds.current.has(order.id) && ["confirmed", "in_kitchen"].includes(order.status)
+          );
+
+          if (newOrders.length > 0) {
+            for (const order of newOrders) {
+              seenOrderIds.current.add(order.id);
+              playKitchenOrderSound();
+
+              const orderNum = String(order.order_number).padStart(3, "0");
+              const itemsDesc =
+                order.items && order.items.length > 0
+                  ? order.items.map((it) => `${it.quantity}× ${it.product_name}`).join(", ")
+                  : "Nuevo pedido ingresado";
+              const deliveryTypeStr =
+                order.delivery_type === "delivery" ? "🛵 Envío a domicilio" : "🏬 Retiro por el local";
+
+              addToast({
+                type: "kitchen",
+                title: `Comanda #${orderNum} · ${order.customer_name}`,
+                subtitle: itemsDesc,
+                meta: `${deliveryTypeStr} · ${money(order.total)}`,
+                actionLabel: "Ver Cocina →",
+                onAction: () => choose("kitchen"),
+              });
+
+              sendDesktopNotification({
+                title: `🍳 ¡Nueva Comanda #${orderNum}!`,
+                body: `${order.customer_name} (${deliveryTypeStr}) - Total: ${money(order.total)}`,
+                onClick: () => {
+                  choose("kitchen");
+                },
+              });
+            }
+          }
+        }
+      } catch {
+        // Silencioso en segundo plano
+      }
+    }
+
+    async function checkChats() {
+      try {
+        const data = await api<{ chats: { phone_number: string; user_name: string; updated_at: number; last_message?: string }[] }>(
+          `/api/chats?businessId=${encodeURIComponent(business.id)}`
+        );
+        if (!activeSync) return;
+
+        if (!initialChatsLoaded.current) {
+          const maxTime = data.chats.reduce((max, chat) => Math.max(max, chat.updated_at || 0), 0);
+          lastChatUpdate.current = maxTime || Date.now();
+          initialChatsLoaded.current = true;
+        } else {
+          // Detectar mensajes con timestamp mayor al último conocido
+          const updatedChats = data.chats.filter((chat) => chat.updated_at > lastChatUpdate.current);
+          if (updatedChats.length > 0) {
+            let highestTimestamp = lastChatUpdate.current;
+            for (const chat of updatedChats) {
+              if (chat.updated_at > highestTimestamp) highestTimestamp = chat.updated_at;
+              if (chat.last_message) {
+                playChatMessageSound();
+
+                addToast({
+                  type: "whatsapp",
+                  title: chat.user_name || chat.phone_number,
+                  subtitle: chat.last_message,
+                  meta: `WhatsApp · ${chat.phone_number}`,
+                  actionLabel: "Ver Chat →",
+                  onAction: () => choose("messages"),
+                });
+
+                sendDesktopNotification({
+                  title: `💬 ${chat.user_name || chat.phone_number}`,
+                  body: chat.last_message,
+                  onClick: () => {
+                    choose("messages");
+                  },
+                });
+              }
+            }
+            lastChatUpdate.current = highestTimestamp;
+          }
+        }
+      } catch {
+        // Silencioso en segundo plano
+      }
+    }
+
+    void checkKitchenOrders();
+    void checkChats();
+
+    // Sincronización continua cada 2.5 segundos
+    const timer = setInterval(() => {
+      void checkKitchenOrders();
+      void checkChats();
+    }, 2500);
+
+    return () => {
+      activeSync = false;
+      clearInterval(timer);
+    };
+  }, [business.id]);
+
   return <div className="k-app">
+    <NotificationToasts toasts={toasts} onDismiss={dismissToast} />
     {mobileOpen && <button className="k-overlay" aria-label="Cerrar menú" onClick={() => setMobileOpen(false)} />}
     <aside className={`k-sidebar ${mobileOpen ? "open" : ""}`}>
       <div className="k-brand"><span className="k-brand-mark">{business.name.slice(0, 1).toUpperCase()}</span><div><strong>{business.name.toUpperCase()}</strong><small>Panel operativo</small></div></div>
@@ -113,7 +367,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
       <div className="k-sidebar-bottom"><div className="k-help"><strong>¿Necesitás intervenir?</strong><small>Usá Derivaciones para tomar reclamos o casos ambiguos.</small></div><div className="k-profile"><span>{name.slice(0, 2).toUpperCase()}</span><div><strong>{name}</strong><small>{user.email}</small></div><a href="/api/auth/logout">Salir</a></div></div>
     </aside>
     <main className="k-main">
-      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú"><Menu size={24} aria-hidden /></button><div><span>{business.name}</span><b>/</b><strong>{visibleSections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><PwaInstall /><span className="k-live"><i aria-hidden /> Panel operativo</span></div></header>
+      <header className="k-topbar"><button className="k-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir menú"><Menu size={24} aria-hidden /></button><div><span>{business.name}</span><b>/</b><strong>{visibleSections.find((section) => section.id === active)?.label}</strong></div><div className="k-top-actions"><AudioControl /><PwaInstall /><span className="k-live"><i aria-hidden /> Panel en vivo</span></div></header>
       <section className="k-content">
         {active === "overview" && <Overview businessId={business.id} onNavigate={choose} />}
         {active === "kitchen" && <KitchenModule businessId={business.id} />}
@@ -148,15 +402,24 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
   }
 
   useEffect(() => {
-    void Promise.all([
+    let active = true;
+    const fetchAll = () => Promise.all([
       api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`),
       api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
       api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
       api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
       api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`),
     ]).then(([settingsData, orderData, productData, contactData, handoffData]) => {
+      if (!active) return;
       setSettings(settingsData.settings); setOrders(orderData.orders); setProducts(productData.products); setContacts(contactData.contacts); setHandoffs(handoffData.handoffs);
-    }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+
+    void fetchAll();
+    const timer = setInterval(fetchAll, 3000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, [businessId]);
 
   async function updateSettings(change: Record<string, unknown>) {
@@ -705,24 +968,99 @@ function KitchenModule({ businessId }: { businessId: string }) {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   async function reload() {
-    const [orderData, contactData, productData] = await Promise.all([api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`), api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`)]);
-    setOrders(orderData.orders); setContacts(contactData.contacts); setProducts(productData.products.filter((product) => product.active));
+    try {
+      const [orderData, contactData, productData] = await Promise.all([
+        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+        api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
+        api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
+      ]);
+      setOrders(orderData.orders);
+      setContacts(contactData.contacts);
+      setProducts(productData.products.filter((product) => product.active));
+    } catch (loadErr) {
+      // Evitar sobreescritura de errores si el componente se desmonta
+    }
   }
-  useEffect(() => { void Promise.all([api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`), api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`), api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`)]).then(([orderData, contactData, productData]) => { setOrders(orderData.orders); setContacts(contactData.contacts); setProducts(productData.products.filter((product) => product.active)); }).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, [businessId]);
-  const visible = useMemo(() => { const term = search.trim().toLowerCase(); return orders.filter((order) => (filter === "all" || filter === "active" && !["delivered", "cancelled"].includes(order.status) || order.status === filter) && (!term || order.customer_name.toLowerCase().includes(term) || order.phone_number.includes(term) || String(order.order_number).includes(term))); }, [orders, filter, search]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchAll = () =>
+      Promise.all([
+        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+        api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
+        api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
+      ])
+        .then(([orderData, contactData, productData]) => {
+          if (!active) return;
+          setOrders(orderData.orders);
+          setContacts(contactData.contacts);
+          setProducts(productData.products.filter((product) => product.active));
+        })
+        .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+
+    void fetchAll();
+    // Actualización automática en tiempo real cada 2.5 segundos
+    const timer = setInterval(fetchAll, 2500);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [businessId]);
+
+  const visible = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return orders.filter(
+      (order) =>
+        (filter === "all" || (filter === "active" && !["delivered", "cancelled"].includes(order.status)) || order.status === filter) &&
+        (!term ||
+          order.customer_name.toLowerCase().includes(term) ||
+          order.phone_number.includes(term) ||
+          String(order.order_number).includes(term))
+    );
+  }, [orders, filter, search]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = new FormData(event.currentTarget); const items = Object.entries(draftItems).filter(([, quantity]) => quantity > 0).map(([productId, quantity]) => ({ productId, quantity }));
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const items = Object.entries(draftItems)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([productId, quantity]) => ({ productId, quantity }));
     const receiptUrl = String(form.get("receiptUrl") || "").trim() || undefined;
-    try { await api("/api/kitchen/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, contactId: form.get("contactId"), deliveryType: form.get("deliveryType"), address: form.get("address"), zone: form.get("zone"), paymentMethod: form.get("paymentMethod"), scheduledTime: form.get("scheduledTime"), shippingCost: Number(form.get("shippingCost")), receiptUrl, notes: form.get("notes"), items }) }); setCreating(false); setDraftItems({}); await reload(); }
-    catch (createError) { setError(createError instanceof Error ? createError.message : "No se pudo crear"); }
+    try {
+      await api("/api/kitchen/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          contactId: form.get("contactId"),
+          deliveryType: form.get("deliveryType"),
+          address: form.get("address"),
+          zone: form.get("zone"),
+          paymentMethod: form.get("paymentMethod"),
+          scheduledTime: form.get("scheduledTime"),
+          shippingCost: Number(form.get("shippingCost")),
+          receiptUrl,
+          notes: form.get("notes"),
+          items,
+        }),
+      });
+      setCreating(false);
+      setDraftItems({});
+      await reload();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "No se pudo crear");
+    }
   }
 
   async function setStatus(order: Order, status: Order["status"]) {
     setUpdatingOrderId(order.id);
     setError("");
     try {
-      await api("/api/kitchen/edit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: order.id, status }) });
+      await api("/api/kitchen/edit", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId, id: order.id, status }),
+      });
       await reload();
     } catch (statusError) {
       setError(statusError instanceof Error ? statusError.message : "No se pudo actualizar");
@@ -730,24 +1068,311 @@ function KitchenModule({ businessId }: { businessId: string }) {
       setUpdatingOrderId(null);
     }
   }
-  function openEdit(order: Order) { setEditing(order); setEditItems(Object.fromEntries(order.items.map((item) => [item.product_id, item.quantity]))); }
-  async function saveEdit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!editing) return; const form = new FormData(event.currentTarget); const items = Object.entries(editItems).filter(([, quantity]) => quantity > 0).map(([productId, quantity]) => ({ productId, quantity }));
-    const receiptUrl = String(form.get("receiptUrl") || "").trim() || null;
-    try { await api("/api/kitchen/edit", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: editing.id, deliveryType: form.get("deliveryType"), address: form.get("address"), zone: form.get("zone"), paymentMethod: form.get("paymentMethod"), scheduledTime: form.get("scheduledTime"), shippingCost: Number(form.get("shippingCost")), receiptUrl, notes: form.get("notes"), items }) }); setEditing(null); setEditItems({}); await reload(); }
-    catch (saveError) { setError(saveError instanceof Error ? saveError.message : "No se pudo guardar"); }
-  }
-  async function remove(order: Order) { if (!window.confirm(`¿Eliminar la comanda #${order.order_number}? El stock limitado se devolverá.`)) return; try { await api("/api/kitchen/delete", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: order.id }) }); await reload(); } catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar"); } }
-  const statusLabel: Record<Order["status"], string> = { confirmed: "Confirmado", in_kitchen: "En cocina", ready: "Listo", delivered: "Entregado", cancelled: "Cancelado" };
 
-  return <div className="k-module">
-    <div className="k-heading"><div><span className="k-eyebrow">COMANDAS</span><h1>Cocina</h1><p>Pedidos confirmados, completos y asociados a un contacto.</p></div><button className="k-primary" onClick={() => setCreating(true)}>＋ Crear comanda</button></div>
-    {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
-    <div className="k-kitchen-tools"><div className="k-tabs"><button className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>Pendientes</button><button className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")}>Listos</button><button className={filter === "delivered" ? "active" : ""} onClick={() => setFilter("delivered")}>Entregados</button><button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Todos</button></div><label className="k-search"><Search size={17} aria-hidden /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente, teléfono o número" /></label></div>
-    <div className="k-order-grid">{visible.map((order) => { const updating = updatingOrderId === order.id; return <article className={`k-order-card ${order.status} ${updating ? "updating" : ""}`} key={order.id}><div className="k-order-head"><div><span>#{String(order.order_number).padStart(3, "0")}</span><b>{statusLabel[order.status]}</b></div><time>{order.scheduled_time}</time></div><div className="k-order-person"><span>{order.customer_name.slice(0, 2).toUpperCase()}</span><div><h2>{order.customer_name}</h2><p>{order.delivery_type === "delivery" ? `Envío · ${order.address || "Sin dirección"}` : "Retiro por el local"}</p></div></div><div className="k-order-items">{order.items.map((item) => <div key={item.id}><span>{item.quantity}×</span><strong>{item.product_name}</strong><em>{money(item.subtotal)}</em></div>)}</div><div className="k-order-meta"><span>{order.payment_method === "transfer" ? "Transferencia" : "Efectivo"}</span>{order.zone && <span>{order.zone}</span>}<strong>{money(order.total)}</strong></div>{order.receipt_url && <div className="k-order-receipt"><a href={order.receipt_url} target="_blank" rel="noreferrer" className="k-receipt-badge">🧾 <span>Ver Comprobante de Pago</span></a></div>}{order.notes && <p className="k-order-note">“{order.notes}”</p>}<div className="k-order-actions">{order.status === "confirmed" && <button className="main" disabled={updating} onClick={() => setStatus(order, "in_kitchen")}>{updating ? "Enviando…" : "Enviar a cocina"}</button>}{order.status === "in_kitchen" && <button className="main" disabled={updating} onClick={() => setStatus(order, "ready")}>{updating ? "Actualizando…" : "Marcar listo"}</button>}{order.status === "ready" && <button className="main" disabled={updating} onClick={() => setStatus(order, "delivered")}>{updating ? "Actualizando…" : "Comanda entregada"}</button>}<button disabled={updating} onClick={() => openEdit(order)}>Editar</button><button disabled={updating} onClick={() => remove(order)}>Eliminar</button></div></article>; })}{!visible.length && <div className="k-empty k-card">No hay comandas en esta vista.</div>}</div>
-    {creating && <div className="modal-backdrop" onMouseDown={() => setCreating(false)}><form className="modal k-modal k-order-modal" onSubmit={create} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="k-eyebrow">NUEVA COMANDA</span><h2>Pedido confirmado</h2></div><button type="button" onClick={() => setCreating(false)}>×</button></div><label>Contacto<select name="contactId" required defaultValue=""><option value="" disabled>Seleccionar contacto</option>{contacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name} · {contact.phone_number}</option>)}</select></label><div className="form-grid"><label>Entrega<select name="deliveryType"><option value="pickup">Retiro</option><option value="delivery">Envío</option></select></label><label>Pago<select name="paymentMethod"><option value="cash">Efectivo</option><option value="transfer">Transferencia</option></select></label></div><div className="form-grid"><label>Horario<input name="scheduledTime" defaultValue="Ahora" /></label><label>Costo de envío<input name="shippingCost" type="number" min="0" defaultValue="0" /></label></div><label>Dirección<input name="address" placeholder="Se usa la del contacto si queda vacío" /></label><label>Zona<select name="zone" defaultValue=""><option value="">Sin zona</option><option>Empalme VC</option><option>Barrio Mitre</option><option>Pavón</option><option>Rincón de Pavón</option></select></label><ProductPicker products={products} items={draftItems} onChange={setDraftItems} /><label>Comprobante de Transferencia (Link / URL opcional)<input name="receiptUrl" placeholder="https://... link de imagen o comprobante" /></label><label>Observaciones<textarea name="notes" placeholder="Portón negro, llamar al llegar..." /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setCreating(false)}>Cancelar</button><button className="k-primary">Crear comanda</button></div></form></div>}
-    {editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><form className="modal k-modal k-order-modal" onSubmit={saveEdit} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="k-eyebrow">COMANDA #{editing.order_number}</span><h2>Editar pedido completo</h2></div><button type="button" onClick={() => setEditing(null)}>×</button></div><div className="form-grid"><label>Entrega<select name="deliveryType" defaultValue={editing.delivery_type}><option value="pickup">Retiro</option><option value="delivery">Envío</option></select></label><label>Pago<select name="paymentMethod" defaultValue={editing.payment_method}><option value="cash">Efectivo</option><option value="transfer">Transferencia</option></select></label></div><div className="form-grid"><label>Horario<input name="scheduledTime" defaultValue={editing.scheduled_time} /></label><label>Costo de envío<input name="shippingCost" type="number" min="0" defaultValue={editing.shipping_cost} /></label></div><label>Dirección<input name="address" defaultValue={editing.address || ""} /></label><label>Zona<input name="zone" defaultValue={editing.zone || ""} /></label><ProductPicker products={products} items={editItems} onChange={setEditItems} includeSoldout /><label>Comprobante de Transferencia (Link / URL opcional)<input name="receiptUrl" defaultValue={editing.receipt_url || ""} placeholder="https://..." /></label><p className="k-form-note">Al guardar, el total y el stock limitado se recalculan automáticamente.</p><label>Observaciones<textarea name="notes" defaultValue={editing.notes || ""} /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button><button className="k-primary">Guardar pedido</button></div></form></div>}
-  </div>;
+  function openEdit(order: Order) {
+    setEditing(order);
+    setEditItems(Object.fromEntries(order.items.map((item) => [item.product_id, item.quantity])));
+  }
+
+  async function saveEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editing) return;
+    const form = new FormData(event.currentTarget);
+    const items = Object.entries(editItems)
+      .filter(([, quantity]) => quantity > 0)
+      .map(([productId, quantity]) => ({ productId, quantity }));
+    const receiptUrl = String(form.get("receiptUrl") || "").trim() || null;
+    try {
+      await api("/api/kitchen/edit", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          id: editing.id,
+          deliveryType: form.get("deliveryType"),
+          address: form.get("address"),
+          zone: form.get("zone"),
+          paymentMethod: form.get("paymentMethod"),
+          scheduledTime: form.get("scheduledTime"),
+          shippingCost: Number(form.get("shippingCost")),
+          receiptUrl,
+          notes: form.get("notes"),
+          items,
+        }),
+      });
+      setEditing(null);
+      setEditItems({});
+      await reload();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
+    }
+  }
+
+  async function remove(order: Order) {
+    if (!window.confirm(`¿Eliminar la comanda #${order.order_number}? El stock limitado se devolverá.`)) return;
+    try {
+      await api("/api/kitchen/delete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId, id: order.id }),
+      });
+      await reload();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar");
+    }
+  }
+
+  const statusLabel: Record<Order["status"], string> = {
+    confirmed: "Confirmado",
+    in_kitchen: "En cocina",
+    ready: "Listo",
+    delivered: "Entregado",
+    cancelled: "Cancelado",
+  };
+
+  const now = Date.now();
+
+  return (
+    <div className="k-module">
+      <div className="k-heading">
+        <div>
+          <span className="k-eyebrow">COMANDAS</span>
+          <h1>Cocina</h1>
+          <p>Pedidos confirmados, completos y asociados a un contacto. Actualización en tiempo real.</p>
+        </div>
+        <button className="k-primary" onClick={() => setCreating(true)}>＋ Crear comanda</button>
+      </div>
+
+      {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
+
+      <div className="k-kitchen-tools">
+        <div className="k-tabs">
+          <button className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>Pendientes</button>
+          <button className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")}>Listos</button>
+          <button className={filter === "delivered" ? "active" : ""} onClick={() => setFilter("delivered")}>Entregados</button>
+          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Todos</button>
+        </div>
+        <label className="k-search">
+          <Search size={17} aria-hidden />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente, teléfono o número" />
+        </label>
+      </div>
+
+      <div className="k-order-grid">
+        {visible.map((order) => {
+          const updating = updatingOrderId === order.id;
+          const isRecent = order.created_at && (now - order.created_at) < 30_000 && ["confirmed", "in_kitchen"].includes(order.status);
+
+          return (
+            <article className={`k-order-card ${order.status} ${updating ? "updating" : ""} ${isRecent ? "is-new" : ""}`} key={order.id}>
+              <div className="k-order-head">
+                <div>
+                  <span>#{String(order.order_number).padStart(3, "0")}</span>
+                  <b>{statusLabel[order.status]}</b>
+                </div>
+                <time>{order.scheduled_time}</time>
+              </div>
+
+              <div className="k-order-person">
+                <span>{order.customer_name.slice(0, 2).toUpperCase()}</span>
+                <div>
+                  <h2>{order.customer_name}</h2>
+                  <p>{order.delivery_type === "delivery" ? `Envío · ${order.address || "Sin dirección"}` : "Retiro por el local"}</p>
+                </div>
+              </div>
+
+              <div className="k-order-items">
+                {order.items.map((item) => (
+                  <div key={item.id}>
+                    <span>{item.quantity}×</span>
+                    <strong>{item.product_name}</strong>
+                    <em>{money(item.subtotal)}</em>
+                  </div>
+                ))}
+              </div>
+
+              <div className="k-order-meta">
+                <span>{order.payment_method === "transfer" ? "Transferencia" : "Efectivo"}</span>
+                {order.zone && <span>{order.zone}</span>}
+                <strong>{money(order.total)}</strong>
+              </div>
+
+              {order.receipt_url && (
+                <div className="k-order-receipt">
+                  <a href={order.receipt_url} target="_blank" rel="noreferrer" className="k-receipt-badge">
+                    🧾 <span>Ver Comprobante de Pago</span>
+                  </a>
+                </div>
+              )}
+
+              {order.notes && <p className="k-order-note">“{order.notes}”</p>}
+
+              <div className="k-order-actions">
+                {order.status === "confirmed" && (
+                  <button className="main" disabled={updating} onClick={() => setStatus(order, "in_kitchen")}>
+                    {updating ? "Enviando…" : "Enviar a cocina"}
+                  </button>
+                )}
+                {order.status === "in_kitchen" && (
+                  <button className="main" disabled={updating} onClick={() => setStatus(order, "ready")}>
+                    {updating ? "Actualizando…" : "Marcar listo"}
+                  </button>
+                )}
+                {order.status === "ready" && (
+                  <button className="main" disabled={updating} onClick={() => setStatus(order, "delivered")}>
+                    {updating ? "Actualizando…" : "Comanda entregada"}
+                  </button>
+                )}
+                <button disabled={updating} onClick={() => openEdit(order)}>Editar</button>
+                <button disabled={updating} onClick={() => remove(order)}>Eliminar</button>
+              </div>
+            </article>
+          );
+        })}
+        {!visible.length && <div className="k-empty k-card">No hay comandas en esta vista.</div>}
+      </div>
+
+      {creating && (
+        <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>
+          <form className="modal k-modal k-order-modal" onSubmit={create} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="k-eyebrow">NUEVA COMANDA</span>
+                <h2>Pedido confirmado</h2>
+              </div>
+              <button type="button" onClick={() => setCreating(false)}>×</button>
+            </div>
+            <label>
+              Contacto
+              <select name="contactId" required defaultValue="">
+                <option value="" disabled>Seleccionar contacto</option>
+                {contacts.map((contact) => (
+                  <option value={contact.id} key={contact.id}>
+                    {contact.name} · {contact.phone_number}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="form-grid">
+              <label>
+                Entrega
+                <select name="deliveryType">
+                  <option value="pickup">Retiro</option>
+                  <option value="delivery">Envío</option>
+                </select>
+              </label>
+              <label>
+                Pago
+                <select name="paymentMethod">
+                  <option value="cash">Efectivo</option>
+                  <option value="transfer">Transferencia</option>
+                </select>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                Horario
+                <input name="scheduledTime" defaultValue="Ahora" />
+              </label>
+              <label>
+                Costo de envío
+                <input name="shippingCost" type="number" min="0" defaultValue="0" />
+              </label>
+            </div>
+            <label>
+              Dirección
+              <input name="address" placeholder="Se usa la del contacto si queda vacío" />
+            </label>
+            <label>
+              Zona
+              <select name="zone" defaultValue="">
+                <option value="">Sin zona</option>
+                <option>Empalme VC</option>
+                <option>Barrio Mitre</option>
+                <option>Pavón</option>
+                <option>Rincón de Pavón</option>
+              </select>
+            </label>
+            <ProductPicker products={products} items={draftItems} onChange={setDraftItems} />
+            <label>
+              Comprobante de Transferencia (Link / URL opcional)
+              <input name="receiptUrl" placeholder="https://... link de imagen o comprobante" />
+            </label>
+            <label>
+              Observaciones
+              <textarea name="notes" placeholder="Portón negro, llamar al llegar..." />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setCreating(false)}>Cancelar</button>
+              <button className="k-primary">Crear comanda</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {editing && (
+        <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
+          <form className="modal k-modal k-order-modal" onSubmit={saveEdit} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="k-eyebrow">COMANDA #{editing.order_number}</span>
+                <h2>Editar pedido completo</h2>
+              </div>
+              <button type="button" onClick={() => setEditing(null)}>×</button>
+            </div>
+            <div className="form-grid">
+              <label>
+                Entrega
+                <select name="deliveryType" defaultValue={editing.delivery_type}>
+                  <option value="pickup">Retiro</option>
+                  <option value="delivery">Envío</option>
+                </select>
+              </label>
+              <label>
+                Pago
+                <select name="paymentMethod" defaultValue={editing.payment_method}>
+                  <option value="cash">Efectivo</option>
+                  <option value="transfer">Transferencia</option>
+                </select>
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                Horario
+                <input name="scheduledTime" defaultValue={editing.scheduled_time} />
+              </label>
+              <label>
+                Costo de envío
+                <input name="shippingCost" type="number" min="0" defaultValue={editing.shipping_cost} />
+              </label>
+            </div>
+            <label>
+              Dirección
+              <input name="address" defaultValue={editing.address || ""} />
+            </label>
+            <label>
+              Zona
+              <input name="zone" defaultValue={editing.zone || ""} />
+            </label>
+            <ProductPicker products={products} items={editItems} onChange={setEditItems} includeSoldout />
+            <label>
+              Comprobante de Transferencia (Link / URL opcional)
+              <input name="receiptUrl" defaultValue={editing.receipt_url || ""} placeholder="https://..." />
+            </label>
+            <p className="k-form-note">Al guardar, el total y el stock limitado se recalculan automáticamente.</p>
+            <label>
+              Observaciones
+              <textarea name="notes" defaultValue={editing.notes || ""} />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button>
+              <button className="k-primary">Guardar pedido</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function SettingsModule({ businessId }: { businessId: string }) {
