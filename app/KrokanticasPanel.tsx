@@ -319,23 +319,39 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
 
     async function checkChats() {
       try {
-        const data = await api<{ chats: { phone_number: string; user_name: string; updated_at: number; last_message?: string }[] }>(
-          `/api/chats?businessId=${encodeURIComponent(business.id)}`
-        );
+        const data = await api<{
+          chats: {
+            phone_number: string;
+            user_name: string;
+            updated_at: number;
+            last_message?: string;
+            last_sender?: "user" | "agent";
+            last_message_at?: number;
+          }[];
+        }>(`/api/chats?businessId=${encodeURIComponent(business.id)}`);
         if (!activeSync) return;
 
         if (!initialChatsLoaded.current) {
-          const maxTime = data.chats.reduce((max, chat) => Math.max(max, chat.updated_at || 0), 0);
+          const maxTime = data.chats.reduce(
+            (max, chat) => Math.max(max, chat.last_message_at || chat.updated_at || 0),
+            0
+          );
           lastChatUpdate.current = maxTime || Date.now();
           initialChatsLoaded.current = true;
         } else {
           // Detectar mensajes con timestamp mayor al último conocido
-          const updatedChats = data.chats.filter((chat) => chat.updated_at > lastChatUpdate.current);
+          const updatedChats = data.chats.filter(
+            (chat) => (chat.last_message_at || chat.updated_at) > lastChatUpdate.current
+          );
           if (updatedChats.length > 0) {
             let highestTimestamp = lastChatUpdate.current;
             for (const chat of updatedChats) {
-              if (chat.updated_at > highestTimestamp) highestTimestamp = chat.updated_at;
-              if (chat.last_message) {
+              const msgTime = chat.last_message_at || chat.updated_at;
+              if (msgTime > highestTimestamp) highestTimestamp = msgTime;
+
+              // SOLO notificar y hacer sonar para mensajes ENTRANTES del cliente (sender === 'user')
+              // Nunca para mensajes que enviamos nosotros o el bot (sender === 'agent')
+              if (chat.last_message && chat.last_sender === "user") {
                 playChatMessageSound();
 
                 addToast({
@@ -343,7 +359,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
                   title: chat.user_name || chat.phone_number,
                   subtitle: chat.last_message,
                   meta: `WhatsApp · ${chat.phone_number}`,
-                  actionLabel: "Ver Chat →",
+                  actionLabel: "Ver Conversación →",
                   onAction: () => choose("messages"),
                 });
 
