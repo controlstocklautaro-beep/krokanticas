@@ -31,6 +31,8 @@ type OrderInput = {
   zona?: string;
   paymentMethod?: "cash" | "transfer";
   payment_method?: "cash" | "transfer";
+  time?: string;
+  horario?: string;
   scheduledTime?: string;
   scheduled_time?: string;
   shippingCost?: number;
@@ -228,7 +230,8 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   }
 
   const paymentMethod = (body.paymentMethod || body.payment_method) === "transfer" ? "transfer" : "cash";
-  const scheduledTime = (body.scheduledTime || body.scheduled_time || "Ahora").trim();
+  const rawTime = body.time ?? body.horario ?? body.scheduledTime ?? body.scheduled_time ?? (rawBody as Record<string, unknown>).time ?? (rawBody as Record<string, unknown>).horario ?? "Ahora";
+  const scheduledTime = String(rawTime || "Ahora").trim();
   const zone = (body.zone || body.zona || "").trim() || null;
   const notes = (body.notes || "").trim() || null;
   const receiptUrl = receiptFromBody(rawBody as Record<string, unknown>).url;
@@ -263,12 +266,18 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     phoneNumber,
     deliveryType,
     address,
+    zone,
     paymentMethod,
+    scheduledTime,
+    scheduled_time: scheduledTime,
+    time: scheduledTime,
+    horario: scheduledTime,
     subtotal,
     shippingCost,
     total: subtotal + shippingCost,
     receiptUrl,
     receipt_url: receiptUrl,
+    notes,
     items: preparedItems.map((i) => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.price, subtotal: i.subtotal })),
   };
 }
@@ -286,6 +295,11 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
   const requestedShippingCost = rawShipping === undefined ? Number(current.shipping_cost) : Math.max(0, Number(rawShipping));
   const shippingCost = deliveryType === "delivery" ? requestedShippingCost : 0;
   const receiptUrl = receiptFromBody(body, current.receipt_url as string | null).url;
+  const scheduledTimeVal = body.time !== undefined ? String(body.time || "Ahora").trim()
+    : body.horario !== undefined ? String(body.horario || "Ahora").trim()
+    : body.scheduledTime !== undefined ? String(body.scheduledTime || "Ahora").trim()
+    : body.scheduled_time !== undefined ? String(body.scheduled_time || "Ahora").trim()
+    : current.scheduled_time ? String(current.scheduled_time) : "Ahora";
   const now = Date.now();
   let subtotal = Number(current.subtotal);
   const statements = [];
@@ -336,9 +350,9 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
 
   const total = subtotal + shippingCost;
   statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ?, status = ?, receipt_url = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" || body.payment_method === "transfer" ? "transfer" : body.paymentMethod === "cash" || body.payment_method === "cash" ? "cash" : current.payment_method, body.scheduledTime === undefined ? current.scheduled_time : String(body.scheduledTime || body.scheduled_time || "Ahora"), subtotal, shippingCost, total, status, receiptUrl, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
+    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" || body.payment_method === "transfer" ? "transfer" : body.paymentMethod === "cash" || body.payment_method === "cash" ? "cash" : current.payment_method, scheduledTimeVal, subtotal, shippingCost, total, status, receiptUrl, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
   await db.batch(statements);
-  return { id, status, subtotal, total, receiptUrl, receipt_url: receiptUrl };
+  return { id, status, scheduledTime: scheduledTimeVal, scheduled_time: scheduledTimeVal, time: scheduledTimeVal, horario: scheduledTimeVal, subtotal, total, receiptUrl, receipt_url: receiptUrl };
 }
 
 export async function deleteKitchenOrder(businessId: string, id: string) {

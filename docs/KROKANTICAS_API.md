@@ -85,14 +85,17 @@ Cada comanda exige un `contactId` válido de la misma empresa. Al crearla, el se
   "address": "Belgrano 325 - Pavon",
   "zone": "Pavon",
   "paymentMethod": "transfer",
-  "scheduledTime": "21:30",
+  "time": "21:30",
   "shippingCost": 4000,
+  "receipt_url": "https://.../comprobante.jpg",
   "notes": "Llamar al llegar",
   "items": [
     { "productId": "uuid-producto", "quantity": 6 }
   ]
 }
 ```
+
+*Nota: Para el horario se admite indistintamente `time`, `horario`, `scheduledTime` o `scheduled_time` (por defecto `"Ahora"`).*
 
 Estados de comanda: `confirmed`, `in_kitchen`, `ready`, `delivered`, `cancelled`.
 
