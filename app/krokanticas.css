@@ -794,7 +794,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 400px;
+  max-width: 420px;
   width: calc(100vw - 32px);
   pointer-events: none;
 }
@@ -803,14 +803,16 @@
   pointer-events: auto;
   position: relative;
   display: flex;
+  align-items: flex-start;
   gap: 14px;
-  padding: 16px;
-  border-radius: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 12px 36px rgba(45, 33, 27, 0.18), 0 2px 8px rgba(45, 33, 27, 0.08);
+  box-shadow: 0 16px 40px rgba(45, 33, 27, 0.16), 0 2px 10px rgba(45, 33, 27, 0.06);
   border: 1px solid var(--k-line);
   animation: k-toast-slide-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+  backdrop-filter: blur(16px);
 }
 
 @keyframes k-toast-slide-in {
@@ -825,32 +827,33 @@
 }
 
 .k-toast-icon {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
   display: grid;
   place-items: center;
   border-radius: 12px;
+  margin-top: 2px;
 }
 
 .k-toast-kitchen {
-  border-color: #f7d2be;
-  border-left: 5px solid var(--k-orange);
+  border-color: #edd5c5;
+  background: linear-gradient(180deg, #fffdfa 0%, #fff8f2 100%);
 }
 
 .k-toast-kitchen .k-toast-icon {
-  background: #fdf0e8;
-  color: var(--k-orange);
+  background: linear-gradient(145deg, #e4752b, #b85416);
+  box-shadow: 0 6px 16px rgba(184, 84, 22, 0.32);
 }
 
 .k-toast-whatsapp {
-  border-color: #c9ebd9;
-  border-left: 5px solid #25D366;
+  border-color: #d6e8dc;
+  background: linear-gradient(180deg, #fffdfa 0%, #f4faf6 100%);
 }
 
 .k-toast-whatsapp .k-toast-icon {
-  background: #eafaf1;
-  color: #128c7e;
+  background: linear-gradient(145deg, #1fa855, #14803d);
+  box-shadow: 0 6px 16px rgba(20, 128, 61, 0.28);
 }
 
 .k-toast-content {
@@ -862,95 +865,143 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
-.k-toast-type {
-  font-size: 10px;
+.k-toast-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.k-toast-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 9.5px;
   font-weight: 850;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.k-toast-kitchen .k-toast-type {
-  color: var(--k-orange);
+.k-toast-badge.kitchen {
+  background: #fae6d8;
+  color: #a7450d;
 }
 
-.k-toast-whatsapp .k-toast-type {
-  color: #128c7e;
+.k-toast-badge.whatsapp {
+  background: #e1f4e9;
+  color: #127943;
+}
+
+.k-toast-time {
+  font-size: 11px;
+  font-weight: 600;
+  color: #998a7e;
 }
 
 .k-toast-close {
+  width: 24px;
+  height: 24px;
   background: transparent;
   border: none;
-  color: var(--k-muted);
+  color: #a09085;
   cursor: pointer;
-  padding: 2px;
   display: grid;
   place-items: center;
   border-radius: 6px;
-  transition: background 0.15s;
+  transition: all 0.15s;
+  margin: -4px -4px 0 0;
 }
 
 .k-toast-close:hover {
-  background: #f0e7db;
+  background: #efe4d5;
   color: var(--k-brown);
 }
 
 .k-toast-title {
-  margin: 0 0 3px;
-  font-size: 14px;
+  margin: 0 0 4px;
+  font-size: 15px;
   font-weight: 750;
   color: var(--k-brown);
   font-family: Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+.k-toast-bubble {
+  margin: 6px 0 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f7efe4;
+  border: 1px solid #ebdecb;
+}
+
+.k-toast-kitchen .k-toast-bubble {
+  background: #fbf3ea;
+  border-color: #f2decb;
+}
+
+.k-toast-whatsapp .k-toast-bubble {
+  background: #f1f8f3;
+  border-color: #dbeee0;
 }
 
 .k-toast-subtitle {
-  margin: 0 0 6px;
-  font-size: 12px;
-  color: #5d5047;
-  line-height: 1.4;
+  margin: 0;
+  font-size: 12.5px;
+  color: #40322a;
+  line-height: 1.45;
   word-break: break-word;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   overflow: hidden;
 }
 
 .k-toast-meta {
   font-size: 11px;
-  color: var(--k-muted);
-  font-weight: 600;
-  margin-bottom: 8px;
+  color: #7d6e64;
+  font-weight: 650;
+  margin-bottom: 10px;
+}
+
+.k-toast-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .k-toast-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 11px;
+  gap: 6px;
+  padding: 7px 15px;
+  border-radius: 9px;
+  font-size: 11.5px;
   font-weight: 750;
   border: none;
   cursor: pointer;
-  transition: transform 0.1s, opacity 0.15s;
+  transition: transform 0.12s, box-shadow 0.15s, opacity 0.15s;
 }
 
 .k-toast-kitchen .k-toast-action-btn {
   background: linear-gradient(135deg, var(--k-orange-2), var(--k-orange));
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(184, 84, 22, 0.25);
+  box-shadow: 0 4px 14px rgba(184, 84, 22, 0.28);
 }
 
 .k-toast-whatsapp .k-toast-action-btn {
-  background: #25D366;
+  background: linear-gradient(135deg, #1fa855, #14803d);
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+  box-shadow: 0 4px 14px rgba(20, 128, 61, 0.25);
 }
 
 .k-toast-action-btn:hover {
   transform: translateY(-1px);
-  opacity: 0.95;
+  box-shadow: 0 6px 18px rgba(45, 33, 27, 0.2);
+  opacity: 0.96;
 }
 
 .k-toast-progress-track {
@@ -959,20 +1010,21 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: #f0e7db;
+  background: #eee3d5;
 }
 
 .k-toast-kitchen .k-toast-progress-bar {
   height: 100%;
-  background: var(--k-orange);
+  background: linear-gradient(90deg, #d36a22, #b85416);
   transition: width 0.05s linear;
 }
 
 .k-toast-whatsapp .k-toast-progress-bar {
   height: 100%;
-  background: #25D366;
+  background: linear-gradient(90deg, #1fa855, #14803d);
   transition: width 0.05s linear;
 }
+
 
 /* ==========================================================================
    Controles de Audio y Notificaciones en Barra Superior
@@ -986,21 +1038,25 @@
 .k-audio-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-height: 38px;
   height: 38px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--k-line);
   border-radius: 9px;
   background: #ffffff;
   color: var(--k-brown);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
   box-sizing: border-box;
+}
+
+.k-audio-btn-label {
+  display: inline;
 }
 
 .k-audio-btn-short {

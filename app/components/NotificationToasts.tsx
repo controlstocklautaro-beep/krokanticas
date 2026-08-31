@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChefHat, MessageCircle, X } from "lucide-react";
+import { ChefHat, MessageCircle, ArrowRight, X } from "lucide-react";
 
 export type ToastItem = {
   id: string;
@@ -61,14 +61,22 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       role="alert"
     >
       <div className="k-toast-icon">
-        {isKitchen ? <ChefHat size={22} aria-hidden /> : <MessageCircle size={22} aria-hidden />}
+        {isKitchen ? (
+          <ChefHat size={22} color="#ffffff" aria-hidden />
+        ) : (
+          <MessageCircle size={22} color="#ffffff" aria-hidden />
+        )}
       </div>
 
       <div className="k-toast-content">
         <div className="k-toast-header">
-          <span className="k-toast-type">
-            {isKitchen ? "🍳 PEDIDO A COCINA" : "💬 WHATSAPP"}
-          </span>
+          <div className="k-toast-badge-wrap">
+            <span className={`k-toast-badge ${isKitchen ? "kitchen" : "whatsapp"}`}>
+              {isKitchen ? "🍳 PEDIDO A COCINA" : "💬 WHATSAPP BUSINESS"}
+            </span>
+            <span className="k-toast-time">• Ahora</span>
+          </div>
+
           <button
             type="button"
             className="k-toast-close"
@@ -80,21 +88,27 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         </div>
 
         <h4 className="k-toast-title">{toast.title}</h4>
-        <p className="k-toast-subtitle">{toast.subtitle}</p>
+
+        <div className="k-toast-bubble">
+          <p className="k-toast-subtitle">{toast.subtitle}</p>
+        </div>
 
         {toast.meta && <div className="k-toast-meta">{toast.meta}</div>}
 
         {toast.onAction && (
-          <button
-            type="button"
-            className="k-toast-action-btn"
-            onClick={() => {
-              toast.onAction?.();
-              onDismiss();
-            }}
-          >
-            {toast.actionLabel || (isKitchen ? "Ver Cocina →" : "Ver Chat →")}
-          </button>
+          <div className="k-toast-footer">
+            <button
+              type="button"
+              className="k-toast-action-btn"
+              onClick={() => {
+                toast.onAction?.();
+                onDismiss();
+              }}
+            >
+              <span>{toast.actionLabel || (isKitchen ? "Ver Cocina" : "Ver Conversación")}</span>
+              <ArrowRight size={14} aria-hidden />
+            </button>
+          </div>
         )}
       </div>
 
