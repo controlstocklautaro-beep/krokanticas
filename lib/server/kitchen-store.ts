@@ -115,6 +115,39 @@ function receiptFromBody(body: Record<string, unknown>, fallback: string | null 
   return { provided: false, url: fallback };
 }
 
+function parseDeliveryType(val: unknown): "delivery" | "pickup" {
+  if (!val) return "pickup";
+  const str = String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (
+    str === "delivery" ||
+    str === "envio" ||
+    str === "domicilio" ||
+    str === "a domicilio" ||
+    str.includes("delivery") ||
+    str.includes("envio")
+  ) {
+    return "delivery";
+  }
+  return "pickup";
+}
+
+function parsePaymentMethod(val: unknown): "transfer" | "cash" {
+  if (!val) return "cash";
+  const str = String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (
+    str === "transfer" ||
+    str === "transferencia" ||
+    str === "mp" ||
+    str === "mercadopago" ||
+    str === "mercado pago" ||
+    str === "banco" ||
+    str.includes("transf")
+  ) {
+    return "transfer";
+  }
+  return "cash";
+}
+
 export async function createKitchenOrder(businessId: string, rawBody: OrderInput | Record<string, unknown>) {
   const body = rawBody as OrderInput;
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -247,15 +280,27 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   }
 
   const subtotal = preparedItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const deliveryType = (body.deliveryType || body.delivery_type) === "delivery" ? "delivery" : "pickup";
-  const rawShippingCost = body.shippingCost ?? body.shipping_cost ?? 0;
-  const shippingCost = deliveryType === "delivery" ? Math.max(0, Number(rawShippingCost)) : 0;
-  const address = deliveryType === "delivery" ? (body.address || body.direccion || contactAddress || "").trim() : null;
+
+  const rawDelivery = body.deliveryType ?? body.delivery_type ?? (rawBody as Record<string, unknown>).tipoEntrega ?? (rawBody as Record<string, unknown>).tipo_entrega ?? (rawBody as Record<string, unknown>).entrega ?? (rawBody as Record<string, unknown>).tipo;
+  const deliveryType = parseDeliveryType(rawDelivery);
+
+  const rawShippingCost = body.shippingCost ?? body.shipping_cost ?? (rawBody as Record<string, unknown>).costoEnvio ?? (rawBody as Record<string, unknown>).costo_envio ?? 0;
+  const shippingCost = deliveryType === "delivery" ? Math.max(0, Number(rawShippingCost) || 0) : 0;
+
+  const rawAddress = (body.address ?? body.direccion ?? (rawBody as Record<string, unknown>).direccion ?? (rawBody as Record<string, unknown>).calle ?? contactAddress ?? "").toString().trim();
+  const address = deliveryType === "delivery" ? rawAddress : (rawAddress || null);
   if (deliveryType === "delivery" && !address) {
     throw new ApiError("Falta la dirección de entrega para el pedido con envío", 400);
   }
 
-  const paymentMethod = (body.paymentMethod || body.payment_method) === "transfer" ? "transfer" : "cash";
+  // Actualizar dirección del contacto si vino en la orden
+  if (contactId && rawAddress && (!contactAddress || rawAddress !== contactAddress)) {
+    await db.prepare("UPDATE contacts SET address = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+      .bind(rawAddress, now, contactId, businessId).run();
+  }
+
+  const rawPayment = body.paymentMethod ?? body.payment_method ?? (rawBody as Record<string, unknown>).metodoPago ?? (rawBody as Record<string, unknown>).metodo_pago ?? (rawBody as Record<string, unknown>).medioPago ?? (rawBody as Record<string, unknown>).medio_pago ?? (rawBody as Record<string, unknown>).pago ?? (rawBody as Record<string, unknown>).formaPago ?? (rawBody as Record<string, unknown>).forma_pago;
+  const paymentMethod = parsePaymentMethod(rawPayment);
 
   // Calcular descuento en efectivo si está habilitado en configuración
   let discountAmount = 0;
@@ -336,9 +381,10 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
   if (!current) throw new ApiError("Comanda no encontrada", 404);
   const allowedStatuses = ["confirmed", "in_kitchen", "ready", "delivered", "cancelled"];
   const status = typeof body.status === "string" && allowedStatuses.includes(body.status) ? body.status : String(current.status);
-  const deliveryType = body.deliveryType === "delivery" || body.delivery_type === "delivery" ? "delivery" : body.deliveryType === "pickup" || body.delivery_type === "pickup" ? "pickup" : String(current.delivery_type);
-  const rawShipping = body.shippingCost !== undefined ? body.shippingCost : body.shipping_cost;
-  const requestedShippingCost = rawShipping === undefined ? Number(current.shipping_cost) : Math.max(0, Number(rawShipping));
+  const rawDelivery = body.deliveryType ?? body.delivery_type ?? (body as Record<string, unknown>).tipoEntrega ?? (body as Record<string, unknown>).tipo_entrega ?? (body as Record<string, unknown>).entrega ?? (body as Record<string, unknown>).tipo;
+  const deliveryType = rawDelivery !== undefined ? parseDeliveryType(rawDelivery) : parseDeliveryType(current.delivery_type);
+  const rawShipping = body.shippingCost !== undefined ? body.shippingCost : (body.shipping_cost !== undefined ? body.shipping_cost : (body as Record<string, unknown>).costoEnvio);
+  const requestedShippingCost = rawShipping === undefined ? Number(current.shipping_cost) : Math.max(0, Number(rawShipping) || 0);
   const shippingCost = deliveryType === "delivery" ? requestedShippingCost : 0;
   const receiptUrl = receiptFromBody(body, current.receipt_url as string | null).url;
   const scheduledTimeVal = body.time !== undefined ? String(body.time || "Ahora").trim()
@@ -394,7 +440,8 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
     }
   }
 
-  const resolvedPaymentMethod = body.paymentMethod === "transfer" || body.payment_method === "transfer" ? "transfer" : body.paymentMethod === "cash" || body.payment_method === "cash" ? "cash" : String(current.payment_method);
+  const rawPayment = body.paymentMethod ?? body.payment_method ?? (body as Record<string, unknown>).metodoPago ?? (body as Record<string, unknown>).metodo_pago ?? (body as Record<string, unknown>).medioPago ?? (body as Record<string, unknown>).medio_pago ?? (body as Record<string, unknown>).pago ?? (body as Record<string, unknown>).formaPago ?? (body as Record<string, unknown>).forma_pago;
+  const resolvedPaymentMethod = rawPayment !== undefined ? parsePaymentMethod(rawPayment) : parsePaymentMethod(current.payment_method);
 
   let discountAmount = 0;
   if (resolvedPaymentMethod === "cash") {
@@ -409,8 +456,15 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
 
   const finalSubtotal = Math.max(0, subtotal - discountAmount);
   const total = finalSubtotal + shippingCost;
+  const rawAddressVal = body.address !== undefined ? body.address : (body.direccion !== undefined ? body.direccion : (body as Record<string, unknown>).calle);
+  const newAddress = rawAddressVal !== undefined ? (String(rawAddressVal || "").trim() || null) : current.address;
+  const rawZoneVal = body.zone !== undefined ? body.zone : (body as Record<string, unknown>).zona;
+  const newZone = rawZoneVal !== undefined ? (String(rawZoneVal || "").trim() || null) : current.zone;
+  const rawNotesVal = body.notes !== undefined ? body.notes : (body as Record<string, unknown>).observaciones;
+  const newNotes = rawNotesVal !== undefined ? (String(rawNotesVal || "").trim() || null) : current.notes;
+
   statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ?, status = ?, receipt_url = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, resolvedPaymentMethod, scheduledTimeVal, subtotal, shippingCost, total, status, receiptUrl, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
+    .bind(deliveryType, newAddress, newZone, resolvedPaymentMethod, scheduledTimeVal, subtotal, shippingCost, total, status, receiptUrl, newNotes, now, id, businessId));
   await db.batch(statements);
   return { id, status, scheduledTime: scheduledTimeVal, scheduled_time: scheduledTimeVal, time: scheduledTimeVal, horario: scheduledTimeVal, subtotal, total, receiptUrl, receipt_url: receiptUrl };
 }
