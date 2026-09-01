@@ -52,25 +52,62 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const body = await req.json() as { businessId?: string; id?: string; name?: string; phone_number?: string; email?: string; address?: string; notes?: string };
+    const body = await req.json() as {
+      businessId?: string;
+      id?: string;
+      contactId?: string;
+      contact_id?: string;
+      name?: string;
+      customerName?: string;
+      customer_name?: string;
+      phone_number?: string;
+      phoneNumber?: string;
+      phone?: string;
+      email?: string;
+      address?: string;
+      direccion?: string;
+      notes?: string;
+      notas?: string;
+    };
     const businessId = businessIdFrom(req, body.businessId);
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager", "reception"] });
-    if (!body.id) throw new ApiError("Falta id", 400);
-    const current = await getD1().prepare("SELECT phone_number, name, email, address, notes FROM contacts WHERE id = ? AND business_id = ?")
-      .bind(body.id, businessId).first<{ phone_number: string; name: string; email: string | null; address: string | null; notes: string | null }>();
-    if (!current) throw new ApiError("Contacto no encontrado", 404);
-    const phoneNumber = body.phone_number ? normalizePhone(body.phone_number) : current.phone_number;
-    const name = body.name?.trim() || current.name;
+
+    const contactId = body.id || body.contactId || body.contact_id;
+    const rawPhone = body.phone_number || body.phoneNumber || body.phone;
+    const normalizedLookupPhone = rawPhone ? normalizePhone(rawPhone) : null;
+
+    if (!contactId && !normalizedLookupPhone) {
+      throw new ApiError("Falta id o phone_number para identificar el contacto", 400);
+    }
+
     const db = getD1();
+    const current = contactId
+      ? await db.prepare("SELECT id, phone_number, name, email, address, notes FROM contacts WHERE id = ? AND business_id = ?")
+          .bind(contactId, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null }>()
+      : await db.prepare("SELECT id, phone_number, name, email, address, notes FROM contacts WHERE phone_number = ? AND business_id = ?")
+          .bind(normalizedLookupPhone, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null }>();
+
+    if (!current) throw new ApiError("Contacto no encontrado", 404);
+
+    const targetPhone = normalizedLookupPhone || current.phone_number;
+    const rawName = body.name ?? body.customerName ?? body.customer_name;
+    const name = rawName !== undefined && rawName.trim() ? rawName.trim() : current.name;
+    const rawAddress = body.address ?? body.direccion;
+    const address = rawAddress !== undefined ? (rawAddress.trim() || null) : current.address;
+    const rawNotes = body.notes ?? body.notas;
+    const notes = rawNotes !== undefined ? (rawNotes.trim() || null) : current.notes;
+    const email = body.email !== undefined ? (body.email.trim() || null) : current.email;
+
+    const now = Date.now();
     await db.batch([
       db.prepare("UPDATE contacts SET phone_number = ?, name = ?, email = ?, address = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-        .bind(phoneNumber, name, body.email ?? current.email, body.address ?? current.address, body.notes ?? current.notes, Date.now(), body.id, businessId),
+        .bind(targetPhone, name, email, address, notes, now, current.id, businessId),
       db.prepare("UPDATE chats SET user_name = ?, phone_number = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
-        .bind(name, phoneNumber, Date.now(), businessId, current.phone_number),
+        .bind(name, targetPhone, now, businessId, current.phone_number),
       db.prepare("UPDATE messages SET phone_number = ? WHERE business_id = ? AND phone_number = ?")
-        .bind(phoneNumber, businessId, current.phone_number),
+        .bind(targetPhone, businessId, current.phone_number),
     ]);
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, contact: { id: current.id, phone_number: targetPhone, name, address, notes, email } });
   } catch (error) {
     return apiErrorResponse(error, "Error actualizando contacto");
   }

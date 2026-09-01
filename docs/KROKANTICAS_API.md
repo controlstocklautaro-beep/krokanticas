@@ -23,15 +23,15 @@ Las contraseñas se almacenan con PBKDF2-SHA256 y sal aleatoria; las sesiones y 
 
 - `GET /api/contacts?businessId=krokanticas`: lista contactos, incluida la propiedad `address`. Admite `phone_number` para buscar un contacto exacto.
 - `POST /api/contacts`: crea un contacto.
-- `PATCH /api/contacts`: edita un contacto por `id`.
+- `PATCH /api/contacts`: edita un contacto por `id` o por `phone_number` (permite actualizar `name`, `address`, `email`, `notes`).
 - `DELETE /api/contacts`: elimina un contacto por `id`.
 
+Ejemplo de modificación de contacto por teléfono:
 ```json
 {
   "businessId": "krokanticas",
-  "name": "Juan Perez",
-  "phone_number": "+5491112345678",
-  "email": "juan@example.com",
+  "phone_number": "+5493516579655",
+  "name": "Ezequiel Contrera",
   "address": "Belgrano 325 - Pavon",
   "notes": "Porton negro"
 }

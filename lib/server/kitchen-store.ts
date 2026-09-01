@@ -126,7 +126,8 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
 
   // 1. Resolver o Crear Contacto
   let contactId = body.contactId || body.contact_id;
-  let customerName = (body.customerName || body.customer_name || body.name || "").trim();
+  const rawExplicitName = (body.name || body.customerName || body.customer_name || (rawBody as Record<string, unknown>).name || (rawBody as Record<string, unknown>).customerName || (rawBody as Record<string, unknown>).customer_name || "").toString().trim();
+  let customerName = rawExplicitName;
   let phoneNumber = (body.phoneNumber || body.phone_number || body.phone || "").trim();
   let contactAddress: string | null = null;
 
@@ -134,9 +135,19 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     const existing = await db.prepare("SELECT id, name, phone_number, address FROM contacts WHERE id = ? AND business_id = ?")
       .bind(contactId, businessId).first<{ id: string; name: string; phone_number: string; address: string | null }>();
     if (existing) {
-      customerName = customerName || existing.name;
       phoneNumber = phoneNumber || existing.phone_number;
       contactAddress = existing.address;
+      if (rawExplicitName) {
+        customerName = rawExplicitName;
+        if (rawExplicitName !== existing.name) {
+          await db.prepare("UPDATE contacts SET name = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+            .bind(rawExplicitName, now, existing.id, businessId).run();
+          await db.prepare("UPDATE chats SET user_name = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
+            .bind(rawExplicitName, now, businessId, existing.phone_number).run();
+        }
+      } else {
+        customerName = existing.name;
+      }
     } else {
       contactId = undefined;
     }
@@ -147,14 +158,29 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
       .bind(phoneNumber, businessId).first<{ id: string; name: string; phone_number: string; address: string | null }>();
     if (existing) {
       contactId = existing.id;
-      customerName = customerName || existing.name;
       contactAddress = existing.address;
+      if (rawExplicitName) {
+        customerName = rawExplicitName;
+        if (rawExplicitName !== existing.name) {
+          await db.prepare("UPDATE contacts SET name = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+            .bind(rawExplicitName, now, existing.id, businessId).run();
+          await db.prepare("UPDATE chats SET user_name = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
+            .bind(rawExplicitName, now, businessId, existing.phone_number).run();
+        }
+      } else {
+        customerName = existing.name;
+      }
     } else {
       // Crear contacto automáticamente
       contactId = crypto.randomUUID();
-      customerName = customerName || `Cliente ${phoneNumber.slice(-4)}`;
+      customerName = rawExplicitName || `Cliente ${phoneNumber.slice(-4)}`;
       await db.prepare("INSERT INTO contacts (id, business_id, phone_number, name, address, agent_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)")
         .bind(contactId, businessId, phoneNumber, customerName, body.address || null, now, now).run();
+      await db.prepare(`
+        INSERT INTO chats (id, business_id, phone_number, user_name, agent_active, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?)
+        ON CONFLICT(business_id, phone_number) DO UPDATE SET user_name = excluded.user_name, updated_at = excluded.updated_at
+      `).bind(`${businessId}:${phoneNumber}`, businessId, phoneNumber, customerName, now).run();
     }
   }
 
