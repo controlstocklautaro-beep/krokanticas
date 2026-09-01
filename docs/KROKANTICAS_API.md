@@ -165,6 +165,12 @@ Motivos admitidos: `complaint`, `ambiguity`, `human_request`, `post_confirmation
       "dinner": "Miércoles a Domingo de 19:30 a 23:30 hs",
       "summary": "Mediodía: Mar a Vie 11:00 a 14:00 hs · Noche: Mié a Dom 19:30 a 23:30 hs"
     },
+    "cash_discount_enabled": 1,
+    "cash_discount_percentage": 10,
+    "cash_discount": {
+      "enabled": true,
+      "percentage": 10
+    },
     "updated_at": 1787159836012
   }
 }
@@ -179,12 +185,17 @@ Motivos admitidos: `complaint`, `ambiguity`, `human_request`, `post_confirmation
   "delayMinutes": 30,
   "courierActive": true,
   "activeAlias": 2,
+  "cashDiscountEnabled": true,
+  "cashDiscountPercentage": 10,
   "address": "Ruta 21 y calle Arroyo Seco. Empalme Villa Constitución.",
   "scheduleLunch": "Martes a Viernes de 11:00 a 14:00 hs",
   "scheduleDinner": "Miércoles a Domingo de 19:30 a 23:30 hs"
 }
 ```
 
+- `cash_discount_enabled` (`cashDiscountEnabled`): `1`/`true` activa el descuento automático al pagar en efectivo; `0`/`false` lo desactiva.
+- `cash_discount_percentage` (`cashDiscountPercentage`): porcentaje de descuento a aplicar (ej: `10` para 10% OFF).
+- `cash_discount`: objeto que resume `{ enabled, percentage }` para uso directo en n8n.
 - `courierActive` (o `courier_active`): `1`/`true` (Cadete disponible, ofrece envíos y retiros) o `0`/`false` (Cadete no disponible, el bot solo ofrece retiro en el local).
 - `active_payment_data`: entrega directamente el alias activo para que el bot de n8n lo envíe al cliente sin lógica condicional.
 

@@ -218,6 +218,8 @@ export const businessSettings = sqliteTable("business_settings", {
   scheduleLunch: text("schedule_lunch"),
   scheduleDinner: text("schedule_dinner"),
   scheduleNotes: text("schedule_notes"),
+  cashDiscountEnabled: integer("cash_discount_enabled", { mode: "boolean" }).notNull().default(0),
+  cashDiscountPercentage: real("cash_discount_percentage").notNull().default(10),
   updatedAt: integer("updated_at").notNull(),
 });
 

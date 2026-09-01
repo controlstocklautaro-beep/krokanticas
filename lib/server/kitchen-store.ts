@@ -256,6 +256,22 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   }
 
   const paymentMethod = (body.paymentMethod || body.payment_method) === "transfer" ? "transfer" : "cash";
+
+  // Calcular descuento en efectivo si está habilitado en configuración
+  let discountAmount = 0;
+  let discountPercentage = 0;
+  if (paymentMethod === "cash") {
+    const settingsRow = await db.prepare("SELECT cash_discount_enabled, cash_discount_percentage FROM business_settings WHERE business_id = ?").bind(businessId).first<{ cash_discount_enabled: number; cash_discount_percentage: number }>();
+    if (Boolean(Number(settingsRow?.cash_discount_enabled ?? 0))) {
+      discountPercentage = Number(settingsRow?.cash_discount_percentage ?? 0);
+      if (discountPercentage > 0) {
+        discountAmount = Math.round(subtotal * (discountPercentage / 100));
+      }
+    }
+  }
+
+  const finalSubtotal = Math.max(0, subtotal - discountAmount);
+  const total = finalSubtotal + shippingCost;
   const rawTime = body.time ?? body.horario ?? body.scheduledTime ?? body.scheduled_time ?? (rawBody as Record<string, unknown>).time ?? (rawBody as Record<string, unknown>).horario ?? "Ahora";
   const scheduledTime = String(rawTime || "Ahora").trim();
   const zone = (body.zone || body.zona || "").trim() || null;
@@ -268,7 +284,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
 
   const statements = [
     db.prepare(`INSERT INTO orders (id, business_id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?)`)
-      .bind(orderId, businessId, contactId, orderNumber, customerName, phoneNumber, deliveryType, address, zone, paymentMethod, scheduledTime, subtotal, shippingCost, subtotal + shippingCost, receiptUrl, notes, now, now),
+      .bind(orderId, businessId, contactId, orderNumber, customerName, phoneNumber, deliveryType, address, zone, paymentMethod, scheduledTime, subtotal, shippingCost, total, receiptUrl, notes, now, now),
   ];
 
   for (const item of preparedItems) {
@@ -299,8 +315,12 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     time: scheduledTime,
     horario: scheduledTime,
     subtotal,
+    discountAmount,
+    discount_amount: discountAmount,
+    discountPercentage,
+    discount_percentage: discountPercentage,
     shippingCost,
-    total: subtotal + shippingCost,
+    total,
     receiptUrl,
     receipt_url: receiptUrl,
     notes,
@@ -374,9 +394,23 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
     }
   }
 
-  const total = subtotal + shippingCost;
+  const resolvedPaymentMethod = body.paymentMethod === "transfer" || body.payment_method === "transfer" ? "transfer" : body.paymentMethod === "cash" || body.payment_method === "cash" ? "cash" : String(current.payment_method);
+
+  let discountAmount = 0;
+  if (resolvedPaymentMethod === "cash") {
+    const settingsRow = await db.prepare("SELECT cash_discount_enabled, cash_discount_percentage FROM business_settings WHERE business_id = ?").bind(businessId).first<{ cash_discount_enabled: number; cash_discount_percentage: number }>();
+    if (Boolean(Number(settingsRow?.cash_discount_enabled ?? 0))) {
+      const discountPercentage = Number(settingsRow?.cash_discount_percentage ?? 0);
+      if (discountPercentage > 0) {
+        discountAmount = Math.round(subtotal * (discountPercentage / 100));
+      }
+    }
+  }
+
+  const finalSubtotal = Math.max(0, subtotal - discountAmount);
+  const total = finalSubtotal + shippingCost;
   statements.push(db.prepare("UPDATE orders SET delivery_type = ?, address = ?, zone = ?, payment_method = ?, scheduled_time = ?, subtotal = ?, shipping_cost = ?, total = ?, status = ?, receipt_url = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, body.paymentMethod === "transfer" || body.payment_method === "transfer" ? "transfer" : body.paymentMethod === "cash" || body.payment_method === "cash" ? "cash" : current.payment_method, scheduledTimeVal, subtotal, shippingCost, total, status, receiptUrl, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
+    .bind(deliveryType, body.address === undefined ? current.address : String(body.address || "").trim() || null, body.zone === undefined ? current.zone : String(body.zone || "").trim() || null, resolvedPaymentMethod, scheduledTimeVal, subtotal, shippingCost, total, status, receiptUrl, body.notes === undefined ? current.notes : String(body.notes || "").trim() || null, now, id, businessId));
   await db.batch(statements);
   return { id, status, scheduledTime: scheduledTimeVal, scheduled_time: scheduledTimeVal, time: scheduledTimeVal, horario: scheduledTimeVal, subtotal, total, receiptUrl, receipt_url: receiptUrl };
 }

@@ -59,6 +59,9 @@ type Settings = {
   schedule_dinner?: string;
   schedule_notes?: string;
   schedules?: { lunch: string; dinner: string; summary: string };
+  cash_discount_enabled?: number;
+  cash_discount_percentage?: number;
+  cash_discount?: { enabled: boolean; percentage: number };
   updated_at: number;
 };
 type Handoff = { id: string; contact_id?: string | null; order_id?: string | null; phone_number?: string | null; customer_name: string; reason: "complaint" | "ambiguity" | "human_request" | "post_confirmation_change" | "other"; summary: string; priority: "low" | "medium" | "high"; status: "open" | "in_progress" | "resolved"; assigned_to?: string | null; created_at: number; updated_at: number; resolved_at?: number | null };
@@ -407,7 +410,14 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
       <div className="k-card">
         <div className="k-card-head">
           <div><span className="k-eyebrow">TRANSFERENCIAS Y COBROS</span><h2>Alias de Pago</h2></div>
-          <span className="k-badge-active">Alias {settings?.active_alias ?? 1} activo</span>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <span className="k-badge-active">Alias {settings?.active_alias ?? 1} activo</span>
+            {Boolean(settings?.cash_discount_enabled) && (
+              <span className="k-badge-active" style={{ background: "#166534", color: "#dcfce7" }}>
+                Efectivo: {settings?.cash_discount_percentage ?? 10}% OFF
+              </span>
+            )}
+          </div>
         </div>
         <div className="k-alias-list">
           <div
@@ -1539,7 +1549,90 @@ function SettingsModule({ businessId }: { businessId: string }) {
         </div>
       </div>
 
-      {/* 4. Cuentas y Alias de Pago */}
+      {/* 4. Descuento por Pago en Efectivo */}
+      <div className="k-card" style={{ marginTop: "18px" }}>
+        <div className="k-card-head">
+          <div>
+            <span className="k-eyebrow">PROMOCIONES Y COBROS</span>
+            <h2>Descuento por Pago en Efectivo</h2>
+          </div>
+          <span className={`k-badge-active ${settings?.cash_discount_enabled ? "on" : "off"}`}>
+            {settings?.cash_discount_enabled ? `${settings?.cash_discount_percentage ?? 10}% OFF ACTIVO` : "DESACTIVADO"}
+          </span>
+        </div>
+
+        <div className="k-card-body">
+          <p className="k-config-desc">
+            Activá un porcentaje de descuento automático cuando los clientes eligen pagar en efectivo. El bot de WhatsApp y las comandas aplicarán este descuento sobre el subtotal del pedido.
+          </p>
+
+          <div className="k-settings" style={{ marginBottom: "16px", gridTemplateColumns: "1fr 1fr" }}>
+            <button
+              className={settings?.cash_discount_enabled ? "on" : "off"}
+              disabled={saving}
+              type="button"
+              onClick={() => update(
+                { cashDiscountEnabled: !settings?.cash_discount_enabled },
+                settings?.cash_discount_enabled ? "Descuento en efectivo desactivado" : `Descuento en efectivo activado (${settings?.cash_discount_percentage ?? 10}% OFF)`
+              )}
+            >
+              <span>{settings?.cash_discount_enabled ? "HABILITADO" : "DESHABILITADO"}</span>
+              <strong>{settings?.cash_discount_enabled ? `${settings?.cash_discount_percentage ?? 10}% OFF` : "Sin descuento"}</strong>
+              <small>Tocá para alternar promoción</small>
+            </button>
+
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: "8px", background: "var(--k-panel-bg, #fcfaf8)", padding: "16px", borderRadius: "12px", border: "1px solid var(--k-line, #ebdcd0)" }}>
+              <small style={{ color: "var(--k-muted)", fontSize: "12px" }}>Accesos rápidos:</small>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {[5, 10, 15, 20].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    className={settings?.cash_discount_percentage === pct && settings?.cash_discount_enabled ? "k-primary" : "secondary"}
+                    style={{ minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
+                    onClick={() => update({ cashDiscountPercentage: pct, cashDiscountEnabled: true }, `Descuento configurado al ${pct}% y activado`)}
+                  >
+                    {pct}% OFF
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const pct = Number(f.get("cashDiscountPercentage") || 0);
+              update({
+                cashDiscountPercentage: pct,
+              }, `Porcentaje de descuento en efectivo actualizado a ${pct}%`);
+            }}
+            className="k-config-form"
+          >
+            <label>
+              <b>Porcentaje de descuento personalizado (%)</b>
+              <input
+                type="number"
+                name="cashDiscountPercentage"
+                min="0"
+                max="100"
+                step="1"
+                key={settings?.cash_discount_percentage ?? 10}
+                defaultValue={settings?.cash_discount_percentage ?? 10}
+                required
+              />
+              <small>Ingresá el valor numérico del porcentaje (ej: 10 para 10% de descuento).</small>
+            </label>
+
+            <button className="k-primary" disabled={saving} style={{ marginTop: "4px" }}>
+              {saving ? "Guardando..." : "Guardar Porcentaje"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {/* 5. Cuentas y Alias de Pago */}
       <div className="k-card" style={{ marginTop: "18px" }}>
         <div className="k-card-head">
           <div>

@@ -81,5 +81,7 @@ export async function ensureSchema(): Promise<void> {
   await db.prepare("ALTER TABLE orders ADD COLUMN IF NOT EXISTS receipt_url TEXT").run();
   await db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT").run();
   await db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS made_to_order BIGINT NOT NULL DEFAULT 0").run();
+  await db.prepare("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS cash_discount_enabled BIGINT NOT NULL DEFAULT 0").run();
+  await db.prepare("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS cash_discount_percentage REAL NOT NULL DEFAULT 10").run();
   schemaReady = true;
 }

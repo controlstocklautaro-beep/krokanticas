@@ -27,6 +27,8 @@ const DEFAULT_SETTINGS = {
   scheduleLunch: "Martes a Viernes de 11:00 a 14:00 hs",
   scheduleDinner: "Miércoles a Domingo de 19:30 a 23:30 hs",
   scheduleNotes: "Mediodía: Mar a Vie 11:00 a 14:00 hs · Noche: Mié a Dom 19:30 a 23:30 hs",
+  cashDiscountEnabled: false,
+  cashDiscountPercentage: 10,
 };
 
 function formatSettings(row: Record<string, unknown> | null) {
@@ -65,6 +67,9 @@ function formatSettings(row: Record<string, unknown> | null) {
   const scheduleDinner = String(row?.schedule_dinner || DEFAULT_SETTINGS.scheduleDinner);
   const scheduleNotes = String(row?.schedule_notes || `Mediodía: ${scheduleLunch} · Noche: ${scheduleDinner}`);
 
+  const cashDiscountEnabled = Boolean(Number(row?.cash_discount_enabled ?? (DEFAULT_SETTINGS.cashDiscountEnabled ? 1 : 0)));
+  const cashDiscountPercentage = Number(row?.cash_discount_percentage ?? DEFAULT_SETTINGS.cashDiscountPercentage);
+
   return {
     store_open: Number(row?.store_open ?? 1),
     delay_minutes: Number(row?.delay_minutes ?? 30),
@@ -83,16 +88,33 @@ function formatSettings(row: Record<string, unknown> | null) {
       dinner: scheduleDinner,
       summary: scheduleNotes,
     },
+    cash_discount_enabled: cashDiscountEnabled ? 1 : 0,
+    cash_discount_percentage: cashDiscountPercentage,
+    cash_discount: {
+      enabled: cashDiscountEnabled,
+      percentage: cashDiscountPercentage,
+    },
     updated_at: Number(row?.updated_at ?? Date.now()),
   };
 }
+
+const SETTINGS_SELECT = `
+  SELECT store_open, delay_minutes, courier_active, address, active_alias,
+         alias_1_name, alias_1_bank, alias_1_holder,
+         alias_2_name, alias_2_bank, alias_2_holder,
+         shipping_zones, schedule_lunch, schedule_dinner, schedule_notes,
+         cash_discount_enabled, cash_discount_percentage,
+         updated_at
+  FROM business_settings
+  WHERE business_id = ?
+`;
 
 export async function GET(req: Request) {
   try {
     const businessId = businessIdFrom(req);
     await requireBusinessAccess(req, businessId, { allowIntegration: true });
     const db = getD1();
-    let row = await db.prepare("SELECT store_open, delay_minutes, courier_active, address, active_alias, alias_1_name, alias_1_bank, alias_1_holder, alias_2_name, alias_2_bank, alias_2_holder, shipping_zones, schedule_lunch, schedule_dinner, schedule_notes, updated_at FROM business_settings WHERE business_id = ?").bind(businessId).first();
+    let row = await db.prepare(SETTINGS_SELECT).bind(businessId).first();
     if (!row) {
       const now = Date.now();
       await db.prepare(`
@@ -102,8 +124,9 @@ export async function GET(req: Request) {
           alias_1_name, alias_1_bank, alias_1_holder,
           alias_2_name, alias_2_bank, alias_2_holder,
           shipping_zones, schedule_lunch, schedule_dinner, schedule_notes,
+          cash_discount_enabled, cash_discount_percentage,
           updated_at
-        ) VALUES (?, 1, 30, 1, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, 1, 30, 1, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         businessId,
         DEFAULT_SETTINGS.address,
@@ -117,9 +140,11 @@ export async function GET(req: Request) {
         DEFAULT_SETTINGS.scheduleLunch,
         DEFAULT_SETTINGS.scheduleDinner,
         DEFAULT_SETTINGS.scheduleNotes,
+        DEFAULT_SETTINGS.cashDiscountEnabled ? 1 : 0,
+        DEFAULT_SETTINGS.cashDiscountPercentage,
         now,
       ).run();
-      row = await db.prepare("SELECT store_open, delay_minutes, courier_active, address, active_alias, alias_1_name, alias_1_bank, alias_1_holder, alias_2_name, alias_2_bank, alias_2_holder, shipping_zones, schedule_lunch, schedule_dinner, schedule_notes, updated_at FROM business_settings WHERE business_id = ?").bind(businessId).first();
+      row = await db.prepare(SETTINGS_SELECT).bind(businessId).first();
     }
     return NextResponse.json({ settings: formatSettings(row) });
   } catch (error) { return apiErrorResponse(error, "Error consultando configuración"); }
@@ -144,6 +169,10 @@ export async function PATCH(req: Request) {
       scheduleLunch?: string;
       scheduleDinner?: string;
       scheduleNotes?: string;
+      cashDiscountEnabled?: boolean;
+      cash_discount_enabled?: boolean | number;
+      cashDiscountPercentage?: number;
+      cash_discount_percentage?: number;
     };
     const businessId = businessIdFrom(req, body.businessId);
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager", "staff"] });
@@ -152,6 +181,12 @@ export async function PATCH(req: Request) {
 
     const activeAlias = body.activeAlias !== undefined ? (Number(body.activeAlias) === 2 ? 2 : 1) : null;
     const shippingZonesJson = Array.isArray(body.shippingZones) ? JSON.stringify(body.shippingZones) : null;
+
+    const rawDiscountEnabled = body.cashDiscountEnabled ?? body.cash_discount_enabled;
+    const cashDiscountEnabled = rawDiscountEnabled === undefined ? null : (rawDiscountEnabled ? 1 : 0);
+
+    const rawDiscountPct = body.cashDiscountPercentage ?? body.cash_discount_percentage;
+    const cashDiscountPercentage = rawDiscountPct === undefined ? null : Math.max(0, Math.min(100, Number(rawDiscountPct) || 0));
 
     const db = getD1();
     const now = Date.now();
@@ -162,8 +197,9 @@ export async function PATCH(req: Request) {
         alias_1_name, alias_1_bank, alias_1_holder,
         alias_2_name, alias_2_bank, alias_2_holder,
         shipping_zones, schedule_lunch, schedule_dinner, schedule_notes,
+        cash_discount_enabled, cash_discount_percentage,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(business_id) DO UPDATE SET
         store_open = COALESCE(?, business_settings.store_open),
         delay_minutes = COALESCE(?, business_settings.delay_minutes),
@@ -180,6 +216,8 @@ export async function PATCH(req: Request) {
         schedule_lunch = COALESCE(?, business_settings.schedule_lunch),
         schedule_dinner = COALESCE(?, business_settings.schedule_dinner),
         schedule_notes = COALESCE(?, business_settings.schedule_notes),
+        cash_discount_enabled = COALESCE(?, business_settings.cash_discount_enabled),
+        cash_discount_percentage = COALESCE(?, business_settings.cash_discount_percentage),
         updated_at = ?
     `).bind(
       businessId,
@@ -198,6 +236,8 @@ export async function PATCH(req: Request) {
       body.scheduleLunch?.trim() || DEFAULT_SETTINGS.scheduleLunch,
       body.scheduleDinner?.trim() || DEFAULT_SETTINGS.scheduleDinner,
       body.scheduleNotes?.trim() || DEFAULT_SETTINGS.scheduleNotes,
+      cashDiscountEnabled ?? (DEFAULT_SETTINGS.cashDiscountEnabled ? 1 : 0),
+      cashDiscountPercentage ?? DEFAULT_SETTINGS.cashDiscountPercentage,
       now,
       // En DO UPDATE SET
       body.storeOpen === undefined ? null : body.storeOpen ? 1 : 0,
@@ -215,10 +255,12 @@ export async function PATCH(req: Request) {
       body.scheduleLunch === undefined ? null : body.scheduleLunch.trim(),
       body.scheduleDinner === undefined ? null : body.scheduleDinner.trim(),
       body.scheduleNotes === undefined ? null : body.scheduleNotes.trim(),
+      cashDiscountEnabled,
+      cashDiscountPercentage,
       now,
     ).run();
 
-    const row = await db.prepare("SELECT store_open, delay_minutes, courier_active, address, active_alias, alias_1_name, alias_1_bank, alias_1_holder, alias_2_name, alias_2_bank, alias_2_holder, shipping_zones, schedule_lunch, schedule_dinner, schedule_notes, updated_at FROM business_settings WHERE business_id = ?").bind(businessId).first();
+    const row = await db.prepare(SETTINGS_SELECT).bind(businessId).first();
     return NextResponse.json({ success: true, settings: formatSettings(row) });
   } catch (error) { return apiErrorResponse(error, "Error actualizando configuración"); }
 }
