@@ -400,7 +400,31 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
   return <div className="k-module">
     <div className="k-heading"><div><span className="k-eyebrow">TURNO ACTUAL</span><h1>Todo listo para operar.</h1><p>Pedidos, cocina, stock y atención humana en una sola vista.</p></div><button className="k-primary" onClick={() => onNavigate("kitchen")}>＋ Nueva comanda</button></div>
     {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
-    <div className="k-settings"><button className={settings?.store_open ? "on" : "off"} onClick={() => updateSettings({ storeOpen: !settings?.store_open })}><span>{settings?.store_open ? "ABIERTO" : "CERRADO"}</span><strong>Local</strong><small>Tocá para cambiar</small></button><button onClick={() => updateSettings({ delayMinutes: settings?.delay_minutes === 15 ? 30 : settings?.delay_minutes === 30 ? 45 : 15 })}><span>DEMORA</span><strong>{settings?.delay_minutes ?? 30} min</strong><small>15, 30 o 45 minutos</small></button><button className={settings?.courier_active ? "on" : "off"} onClick={() => updateSettings({ courierActive: !settings?.courier_active })}><span>CADETE</span><strong>{settings?.courier_active ? "Disponible" : "No disponible"}</strong><small>Controla los envíos</small></button></div>
+    <div className="k-settings">
+      <button className={settings?.store_open ? "on" : "off"} onClick={() => updateSettings({ storeOpen: !settings?.store_open })}>
+        <span>{settings?.store_open ? "ABIERTO" : "CERRADO"}</span>
+        <strong>Local</strong>
+        <small>Tocá para alternar</small>
+      </button>
+      <button onClick={() => updateSettings({ delayMinutes: settings?.delay_minutes === 15 ? 30 : settings?.delay_minutes === 30 ? 45 : 15 })}>
+        <span>DEMORA</span>
+        <strong>{settings?.delay_minutes ?? 30} min</strong>
+        <small>15, 30 o 45 minutos</small>
+      </button>
+      <button className={settings?.courier_active ? "on" : "off"} onClick={() => updateSettings({ courierActive: !settings?.courier_active })}>
+        <span>CADETE</span>
+        <strong>{settings?.courier_active ? "Disponible" : "No disponible"}</strong>
+        <small>Controla los envíos</small>
+      </button>
+      <button
+        className={settings?.cash_discount_enabled ? "on" : "off"}
+        onClick={() => updateSettings({ cashDiscountEnabled: !settings?.cash_discount_enabled })}
+      >
+        <span>DESC. EFECTIVO</span>
+        <strong>{settings?.cash_discount_enabled ? `${settings?.cash_discount_percentage ?? 10}% OFF` : "Desactivado"}</strong>
+        <small>{settings?.cash_discount_enabled ? "Aplicando en bot y cocina" : "Tocá para activar"}</small>
+      </button>
+    </div>
     <div className="k-kpis"><article><span className="orange"><ChefHat size={23} aria-hidden /></span><div><small>En cocina</small><strong>{activeOrders.length}</strong><em>{orders.filter((order) => order.status === "ready").length} listos para entregar</em></div></article><article><span className="gold"><Boxes size={23} aria-hidden /></span><div><small>Stock con alerta</small><strong>{lowStock.length}</strong><em>{products.filter((product) => product.stock_status === "soldout").length} variedades agotadas</em></div></article><article className={attentionCases.length ? "attention" : ""}><span className="red"><AlertTriangle size={23} aria-hidden /></span><div><small>Atención humana</small><strong>{attentionCases.length}</strong><em>{attentionCases.filter((handoff) => handoff.priority === "high").length} casos prioritarios</em></div></article></div>
     <div className="k-overview-grid">
       <div className="k-card"><div className="k-card-head"><div><span className="k-eyebrow">PEDIDOS</span><h2>Confirmados pendientes</h2></div><button onClick={() => onNavigate("kitchen")}>Ver cocina →</button></div>{activeOrders.slice(0, 4).map((order) => <div className="k-mini-order" key={order.id}><b>#{String(order.order_number).padStart(3, "0")}</b><span><strong>{order.customer_name}</strong><small>{order.items.reduce((sum, item) => sum + item.quantity, 0)} unidades · {order.delivery_type === "delivery" ? "Envío" : "Retiro"}</small></span><em>{order.scheduled_time}</em></div>)}{!activeOrders.length && <div className="k-empty">No hay pedidos pendientes.</div>}</div>
@@ -1424,10 +1448,10 @@ function SettingsModule({ businessId }: { businessId: string }) {
       {message && <div className="k-success-banner">{message}</div>}
       {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
 
-      {/* 1. Turno, Cadete y Demora */}
+      {/* 1. Turno, Cadete, Demora y Descuento */}
       <div className="k-config-section">
-        <h2>1. Estado Operativo y Cadete</h2>
-        <p className="k-config-desc">El cadete es opcional según haya o no repartidor en el turno. Si está apagado, el bot solo ofrece retiro por el local.</p>
+        <h2>1. Estado Operativo y Promociones</h2>
+        <p className="k-config-desc">Controlá en tiempo real el estado del local, cadete, demora y la promoción de descuento por pago en efectivo.</p>
         <div className="k-settings">
           <button
             className={settings?.store_open ? "on" : "off"}
@@ -1459,6 +1483,16 @@ function SettingsModule({ businessId }: { businessId: string }) {
             <span>DEMORA ACTUAL</span>
             <strong>{settings?.delay_minutes ?? 30} min</strong>
             <small>Rotar a 15, 30 o 45 min</small>
+          </button>
+
+          <button
+            className={settings?.cash_discount_enabled ? "on" : "off"}
+            disabled={saving}
+            onClick={() => update({ cashDiscountEnabled: !settings?.cash_discount_enabled }, settings?.cash_discount_enabled ? "Descuento en efectivo desactivado" : `Descuento en efectivo activado (${settings?.cash_discount_percentage ?? 10}% OFF)`)}
+          >
+            <span>DESC. EFECTIVO</span>
+            <strong>{settings?.cash_discount_enabled ? `${settings?.cash_discount_percentage ?? 10}% OFF` : "Desactivado"}</strong>
+            <small>{settings?.cash_discount_enabled ? "Promoción activa" : "Tocá para activar"}</small>
           </button>
         </div>
       </div>
@@ -1581,20 +1615,22 @@ function SettingsModule({ businessId }: { businessId: string }) {
               <small>Tocá para alternar promoción</small>
             </button>
 
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: "8px", background: "var(--k-panel-bg, #fcfaf8)", padding: "16px", borderRadius: "12px", border: "1px solid var(--k-line, #ebdcd0)" }}>
-              <small style={{ color: "var(--k-muted)", fontSize: "12px" }}>Accesos rápidos:</small>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: "10px", background: "var(--k-cream, #faf7f1)", padding: "16px", borderRadius: "12px", border: "1px solid var(--k-line, #ebdcd0)" }}>
+              <small style={{ color: "var(--k-muted)", fontSize: "12px", fontWeight: "700" }}>Accesos rápidos:</small>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {[5, 10, 15, 20].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    className={settings?.cash_discount_percentage === pct && settings?.cash_discount_enabled ? "k-primary" : "secondary"}
-                    style={{ minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
-                    onClick={() => update({ cashDiscountPercentage: pct, cashDiscountEnabled: true }, `Descuento configurado al ${pct}% y activado`)}
-                  >
-                    {pct}% OFF
-                  </button>
-                ))}
+                {[5, 10, 15, 20].map((pct) => {
+                  const isSelected = settings?.cash_discount_percentage === pct && Boolean(settings?.cash_discount_enabled);
+                  return (
+                    <button
+                      key={pct}
+                      type="button"
+                      className={`k-pct-btn ${isSelected ? "selected" : ""}`}
+                      onClick={() => update({ cashDiscountPercentage: pct, cashDiscountEnabled: true }, `Descuento configurado al ${pct}% y activado`)}
+                    >
+                      {pct}% OFF
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
