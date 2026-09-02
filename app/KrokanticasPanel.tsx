@@ -335,7 +335,37 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
     <aside className={`k-sidebar ${mobileOpen ? "open" : ""}`}>
       <div className="k-brand"><span className="k-brand-mark">{business.name.slice(0, 1).toUpperCase()}</span><div><strong>{business.name.toUpperCase()}</strong><small>Panel operativo</small></div></div>
       <BusinessSwitcher activeBusiness={business} />
-      <nav aria-label={`Navegación ${business.name}`}>{["OPERACIÓN", "ATENCIÓN", "CONFIGURACIÓN"].map((group) => visibleSections.some((section) => section.group === group) && <div className="k-nav-group" key={group}><p>{group}</p>{visibleSections.filter((section) => section.group === group).map((section) => { const SectionIcon = section.icon; return <button key={section.id} className={active === section.id ? "active" : ""} onClick={() => choose(section.id)}><span><SectionIcon size={19} strokeWidth={1.9} aria-hidden /></span>{section.label}{["kitchen", "handoffs"].includes(section.id) && <b className="k-notification-dot" aria-label="Hay actividad" />}</button>; })}</div>)}</nav>
+      <nav aria-label={`Navegación ${business.name}`}>
+        {["OPERACIÓN", "ATENCIÓN", "CONFIGURACIÓN"].map(
+          (group) =>
+            visibleSections.some((section) => section.group === group) && (
+              <div className="k-nav-group" key={group}>
+                <p>{group}</p>
+                {visibleSections
+                  .filter((section) => section.group === group)
+                  .map((section) => {
+                    const SectionIcon = section.icon;
+                    return (
+                      <button
+                        key={section.id}
+                        className={`${active === section.id ? "active" : ""} ${section.id === "finances" ? "k-nav-locked" : ""}`}
+                        onClick={() => choose(section.id)}
+                      >
+                        <span>
+                          <SectionIcon size={19} strokeWidth={1.9} aria-hidden />
+                        </span>
+                        {section.label}
+                        {section.id === "finances" && <span className="k-nav-lock-badge">🔒 Bloqueado</span>}
+                        {["kitchen", "handoffs"].includes(section.id) && (
+                          <b className="k-notification-dot" aria-label="Hay actividad" />
+                        )}
+                      </button>
+                    );
+                  })}
+              </div>
+            )
+        )}
+      </nav>
       <div className="k-sidebar-bottom"><div className="k-help"><strong>¿Necesitás intervenir?</strong><small>Usá Derivaciones para tomar reclamos o casos ambiguos.</small></div><div className="k-profile"><span>{name.slice(0, 2).toUpperCase()}</span><div><strong>{name}</strong><small>{user.email}</small></div><a href="/api/auth/logout">Salir</a></div></div>
     </aside>
     <main className="k-main">
@@ -1995,37 +2025,45 @@ function FinancesModule() {
   const whatsappUrl =
     "https://wa.me/5493516579655?text=" +
     encodeURIComponent(
-      "¡Hola! Me comunico desde el panel de Krokanticas para consultar sobre la activación del módulo premium de Finanzas y Reportes con Apoc Automation."
+      "¡Hola Apoc Automation! Quiero solicitar el desbloqueo del módulo de Finanzas y Reportes para Krokanticas."
     );
 
   return (
     <div className="k-module">
       <div className="k-heading">
         <div>
-          <span className="k-eyebrow">INTEGRACIÓN PREMIUM · APOC AUTOMATION</span>
+          <span className="k-eyebrow">🔒 FUNCIÓN BLOQUEADA · PLAN ACTUAL</span>
           <h1>Finanzas y Rendimiento</h1>
           <p>Control de caja, análisis de costos, ticket promedio y cálculo de rentabilidad en tiempo real.</p>
         </div>
       </div>
 
-      {/* Banner Principal de Construcción y Activación */}
+      {/* Banner Principal de Bloqueo y Desbloqueo */}
       <div className="k-pro-lock-banner">
         <div className="k-pro-lock-icon">
-          <Lock size={28} />
+          <Lock size={30} />
         </div>
         <div className="k-pro-lock-content">
-          <div className="k-pro-pill">
-            <Sparkles size={14} />
-            <span>MÓDULO EN CONSTRUCCIÓN / ADICIONAL PREMIUM</span>
+          <div className="k-pro-pill locked">
+            <Lock size={13} />
+            <span>MÓDULO BLOQUEADO · EXCLUSIVO PRO</span>
           </div>
-          <h2>Automatizá y controlá los números de tu negocio</h2>
+          <h2>Desbloqueá el Control Financiero Inteligente</h2>
           <p>
-            El módulo de Finanzas te permitirá visualizar balances automáticos de cobranzas (efectivo vs. transferencias), control de stock de insumos, costo unitario por empanada, cálculo de ganancia neta diaria y reportes exportables para el contador.
+            Este módulo se encuentra <strong>bloqueado</strong> para tu cuenta. Al solicitar su activación con <strong>Apoc Automation</strong> podrás acceder a:
           </p>
+
+          <ul className="k-pro-unlock-features">
+            <li><span>✔</span> <strong>Arqueo y balance automático:</strong> discriminación de cobros en efectivo vs. transferencias.</li>
+            <li><span>✔</span> <strong>Costeo de mercadería:</strong> cálculo automático del costo unitario y margen bruto por empanada.</li>
+            <li><span>✔</span> <strong>Reportes contables:</strong> exportación mensual para administración o contador.</li>
+            <li><span>✔</span> <strong>Ticket promedio y picos de venta:</strong> analítica de los días y horarios con mayor facturación.</li>
+          </ul>
+
           <div className="k-pro-apoc-box">
             <div>
-              <strong>¿Querés incorporar este módulo a tu panel?</strong>
-              <span>Contactate con <b>Apoc Automation</b> para activarlo como funcionalidad adicional en tu plan.</span>
+              <strong>¿Querés desbloquear este módulo para tu negocio?</strong>
+              <span>Contactanos por WhatsApp y te lo activamos como integración adicional en tu panel.</span>
             </div>
             <a
               href={whatsappUrl}
@@ -2033,71 +2071,80 @@ function FinancesModule() {
               rel="noreferrer"
               className="k-primary k-btn-apoc"
             >
-              🚀 Contactar a Apoc Automation
+              💬 Desbloquear por WhatsApp (Apoc Automation)
             </a>
           </div>
         </div>
       </div>
 
-      {/* Mockup visual en tonos grises / desactivado */}
-      <div className="k-finance-preview-grid">
-        <div className="k-card k-finance-card-mock">
-          <div className="k-finance-mock-head">
-            <span>Ingresos Totales (Mes)</span>
-            <TrendingUp size={16} />
+      {/* Vista previa bloqueada / difuminada */}
+      <div className="k-finance-locked-container">
+        <div className="k-finance-blur-overlay">
+          <div className="k-lock-badge-floating">
+            <Lock size={18} />
+            <span>Vista previa bloqueada · Requiere activación</span>
           </div>
-          <div className="k-finance-mock-val">$1.485.000</div>
-          <div className="k-finance-mock-sub">+18.4% vs mes anterior</div>
         </div>
 
-        <div className="k-card k-finance-card-mock">
-          <div className="k-finance-mock-head">
-            <span>Costo Estimado de Mercadería</span>
-            <CircleDollarSign size={16} />
+        <div className="k-finance-preview-grid">
+          <div className="k-card k-finance-card-mock">
+            <div className="k-finance-mock-head">
+              <span>Ingresos Totales (Mes)</span>
+              <TrendingUp size={16} />
+            </div>
+            <div className="k-finance-mock-val">$1.485.000</div>
+            <div className="k-finance-mock-sub">+18.4% vs mes anterior</div>
           </div>
-          <div className="k-finance-mock-val">$519.750</div>
-          <div className="k-finance-mock-sub">35.0% del total vendido</div>
+
+          <div className="k-card k-finance-card-mock">
+            <div className="k-finance-mock-head">
+              <span>Costo Estimado de Mercadería</span>
+              <CircleDollarSign size={16} />
+            </div>
+            <div className="k-finance-mock-val">$519.750</div>
+            <div className="k-finance-mock-sub">35.0% del total vendido</div>
+          </div>
+
+          <div className="k-card k-finance-card-mock">
+            <div className="k-finance-mock-head">
+              <span>Ganancia Bruta Operativa</span>
+              <Sparkles size={16} />
+            </div>
+            <div className="k-finance-mock-val">$965.250</div>
+            <div className="k-finance-mock-sub">Margen bruto 65.0%</div>
+          </div>
+
+          <div className="k-card k-finance-card-mock">
+            <div className="k-finance-mock-head">
+              <span>Ticket Promedio</span>
+              <ChefHat size={16} />
+            </div>
+            <div className="k-finance-mock-val">$18.200</div>
+            <div className="k-finance-mock-sub">~12 empanadas por comanda</div>
+          </div>
         </div>
 
-        <div className="k-card k-finance-card-mock">
-          <div className="k-finance-mock-head">
-            <span>Ganancia Bruta Operativa</span>
-            <Sparkles size={16} />
+        <div className="k-finance-charts-mock">
+          <div className="k-card k-finance-card-mock">
+            <span className="k-eyebrow">DISTRIBUCIÓN DE MEDIOS DE PAGO</span>
+            <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Efectivo vs. Transferencias</h3>
+            <div className="k-finance-bar-mock">
+              <div className="k-bar-cash" style={{ width: "58%" }}>58% Efectivo</div>
+              <div className="k-bar-transfer" style={{ width: "42%" }}>42% Transferencia</div>
+            </div>
+            <small className="k-mock-foot">Métricas actualizadas automáticamente con cada comanda confirmada.</small>
           </div>
-          <div className="k-finance-mock-val">$965.250</div>
-          <div className="k-finance-mock-sub">Margen bruto 65.0%</div>
-        </div>
 
-        <div className="k-card k-finance-card-mock">
-          <div className="k-finance-mock-head">
-            <span>Ticket Promedio</span>
-            <ChefHat size={16} />
+          <div className="k-card k-finance-card-mock">
+            <span className="k-eyebrow">VARIEDADES MÁS VENDIDAS</span>
+            <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Ranking de Ventas y Márgenes</h3>
+            <ul className="k-finance-rank-mock">
+              <li><span>1. Vacío y provoleta</span><strong>$342.000</strong></li>
+              <li><span>2. Carne cortada a cuchillo</span><strong>$286.000</strong></li>
+              <li><span>3. Jamón y queso</span><strong>$218.400</strong></li>
+              <li><span>4. Osobuco al vino tinto</span><strong>$198.000</strong></li>
+            </ul>
           </div>
-          <div className="k-finance-mock-val">$18.200</div>
-          <div className="k-finance-mock-sub">~12 empanadas por comanda</div>
-        </div>
-      </div>
-
-      <div className="k-finance-charts-mock">
-        <div className="k-card k-finance-card-mock">
-          <span className="k-eyebrow">DISTRIBUCIÓN DE MEDIOS DE PAGO</span>
-          <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Efectivo vs. Transferencias</h3>
-          <div className="k-finance-bar-mock">
-            <div className="k-bar-cash" style={{ width: "58%" }}>58% Efectivo</div>
-            <div className="k-bar-transfer" style={{ width: "42%" }}>42% Transferencia</div>
-          </div>
-          <small className="k-mock-foot">Métricas actualizadas automáticamente con cada comanda confirmada.</small>
-        </div>
-
-        <div className="k-card k-finance-card-mock">
-          <span className="k-eyebrow">VARIEDADES MÁS VENDIDAS</span>
-          <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Ranking de Ventas y Márgenes</h3>
-          <ul className="k-finance-rank-mock">
-            <li><span>1. Vacío y provoleta</span><strong>$342.000</strong></li>
-            <li><span>2. Carne cortada a cuchillo</span><strong>$286.000</strong></li>
-            <li><span>3. Jamón y queso</span><strong>$218.400</strong></li>
-            <li><span>4. Osobuco al vino tinto</span><strong>$198.000</strong></li>
-          </ul>
         </div>
       </div>
     </div>
