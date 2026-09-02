@@ -349,7 +349,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
                     return (
                       <button
                         key={section.id}
-                        className={`${active === section.id ? "active" : ""} ${section.id === "finances" ? "k-nav-locked" : ""}`}
+                        className={active === section.id ? "active" : ""}
                         onClick={() => choose(section.id)}
                       >
                         <span>
@@ -357,8 +357,8 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
                         </span>
                         {section.label}
                         {section.id === "finances" && (
-                          <span className="k-nav-lock-pill">
-                            <Lock size={10} strokeWidth={2.4} aria-hidden /> PRO
+                          <span className="k-nav-lock">
+                            <Lock size={12} strokeWidth={2.2} aria-hidden />
                           </span>
                         )}
                         {["kitchen", "handoffs"].includes(section.id) && (
@@ -2037,131 +2037,153 @@ function FinancesModule() {
     <div className="k-module">
       <div className="k-heading">
         <div>
-          <span className="k-eyebrow">FUNCIÓN BLOQUEADA · PLAN ACTUAL</span>
+          <span className="k-eyebrow">INTEGRACIÓN ADICIONAL · APOC AUTOMATION</span>
           <h1>Finanzas y Rendimiento</h1>
-          <p>Control de caja, análisis de costos, ticket promedio y cálculo de rentabilidad en tiempo real.</p>
+          <p>Módulo de control de caja, balance financiero, costeo de mercadería y métricas de facturación.</p>
         </div>
       </div>
 
-      {/* Banner Principal de Bloqueo y Desbloqueo */}
-      <div className="k-pro-lock-banner">
-        <div className="k-pro-lock-icon">
-          <Lock size={30} strokeWidth={2.2} aria-hidden />
-        </div>
-        <div className="k-pro-lock-content">
-          <div className="k-pro-pill locked">
-            <Lock size={11} strokeWidth={2.4} aria-hidden />
-            <span>MÓDULO BLOQUEADO · EXCLUSIVO PRO</span>
+      {/* Tarjeta de Bloqueo Principal */}
+      <div className="k-card k-finance-hero-card">
+        <div className="k-finance-hero-head">
+          <div className="k-finance-hero-icon">
+            <Lock size={24} strokeWidth={2.2} aria-hidden />
           </div>
-          <h2>Desbloqueá el Control Financiero Inteligente</h2>
-          <p>
-            Este módulo se encuentra <strong>bloqueado</strong> para tu cuenta. Al solicitar su activación con <strong>Apoc Automation</strong> podrás acceder a:
-          </p>
+          <div className="k-finance-hero-info">
+            <span className="k-eyebrow">MÓDULO BLOQUEADO</span>
+            <h2>Control Financiero Inteligente</h2>
+            <p className="k-finance-hero-desc">
+              Este módulo se encuentra bloqueado para tu cuenta actual. Para habilitarlo en tu local, contactate con el equipo de Apoc Automation.
+            </p>
+          </div>
+        </div>
 
-          <ul className="k-pro-unlock-features">
-            <li>
-              <Check size={14} strokeWidth={2.6} aria-hidden />
-              <span><strong>Arqueo y balance automático:</strong> discriminación de cobros en efectivo vs. transferencias.</span>
-            </li>
-            <li>
-              <Check size={14} strokeWidth={2.6} aria-hidden />
-              <span><strong>Costeo de mercadería:</strong> cálculo automático del costo unitario y margen bruto por empanada.</span>
-            </li>
-            <li>
-              <Check size={14} strokeWidth={2.6} aria-hidden />
-              <span><strong>Reportes contables:</strong> exportación mensual para administración o contador.</span>
-            </li>
-            <li>
-              <Check size={14} strokeWidth={2.6} aria-hidden />
-              <span><strong>Ticket promedio y picos de venta:</strong> analítica de los días y horarios con mayor facturación.</span>
-            </li>
-          </ul>
-
-          <div className="k-pro-apoc-box">
+        <div className="k-finance-features-grid">
+          <div className="k-finance-feat-box">
+            <span className="k-feat-check"><Check size={14} strokeWidth={3} aria-hidden /></span>
             <div>
-              <strong>¿Querés desbloquear este módulo para tu negocio?</strong>
-              <span>Contactanos por WhatsApp y te lo activamos como integración adicional en tu panel.</span>
+              <strong>Arqueo y balance automático</strong>
+              <small>Discriminación de cobros en efectivo y transferencias en tiempo real.</small>
             </div>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="k-primary k-btn-apoc"
-            >
-              <MessageCircle size={16} strokeWidth={2.2} aria-hidden />
-              <span>Desbloquear por WhatsApp (Apoc Automation)</span>
-            </a>
           </div>
+
+          <div className="k-finance-feat-box">
+            <span className="k-feat-check"><Check size={14} strokeWidth={3} aria-hidden /></span>
+            <div>
+              <strong>Costeo de mercadería y márgenes</strong>
+              <small>Cálculo automático de costo unitario y ganancia bruta por empanada.</small>
+            </div>
+          </div>
+
+          <div className="k-finance-feat-box">
+            <span className="k-feat-check"><Check size={14} strokeWidth={3} aria-hidden /></span>
+            <div>
+              <strong>Reportes contables mensuales</strong>
+              <small>Resumen mensual descargable listo para administración y contador.</small>
+            </div>
+          </div>
+
+          <div className="k-finance-feat-box">
+            <span className="k-feat-check"><Check size={14} strokeWidth={3} aria-hidden /></span>
+            <div>
+              <strong>Ticket promedio y picos de venta</strong>
+              <small>Analítica de días, horarios y variedades con mayor rendimiento económico.</small>
+            </div>
+          </div>
+        </div>
+
+        <div className="k-finance-cta-row">
+          <div className="k-finance-cta-copy">
+            <strong>¿Querés activar este módulo para tu negocio?</strong>
+            <span>Escribinos por WhatsApp y coordinamos la activación para tu panel.</span>
+          </div>
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="k-primary k-whatsapp-cta-btn"
+          >
+            <MessageCircle size={17} strokeWidth={2.2} aria-hidden />
+            <span>Desbloquear por WhatsApp</span>
+          </a>
         </div>
       </div>
 
-      {/* Vista previa bloqueada / difuminada */}
-      <div className="k-finance-locked-container">
-        <div className="k-finance-blur-overlay">
-          <div className="k-lock-badge-floating">
-            <Lock size={16} strokeWidth={2.2} aria-hidden />
-            <span>Vista previa bloqueada · Requiere activación</span>
+      {/* Vista Previa Bloqueada (Mockups con blur) */}
+      <div className="k-finance-preview-wrapper">
+        <div className="k-finance-preview-overlay">
+          <div className="k-finance-overlay-badge">
+            <Lock size={15} strokeWidth={2.2} aria-hidden />
+            <span>Vista previa · Requiere activación</span>
           </div>
         </div>
 
-        <div className="k-finance-preview-grid">
-          <div className="k-card k-finance-card-mock">
-            <div className="k-finance-mock-head">
-              <span>Ingresos Totales (Mes)</span>
-              <TrendingUp size={16} />
+        <div className="k-kpis" style={{ marginBottom: "14px" }}>
+          <article>
+            <span className="green"><TrendingUp size={20} /></span>
+            <div>
+              <small>Ingresos Totales (Mes)</small>
+              <strong>$1.485.000</strong>
+              <em>+18.4% vs mes anterior</em>
             </div>
-            <div className="k-finance-mock-val">$1.485.000</div>
-            <div className="k-finance-mock-sub">+18.4% vs mes anterior</div>
-          </div>
+          </article>
 
-          <div className="k-card k-finance-card-mock">
-            <div className="k-finance-mock-head">
-              <span>Costo Estimado de Mercadería</span>
-              <CircleDollarSign size={16} />
+          <article>
+            <span className="gold"><CircleDollarSign size={20} /></span>
+            <div>
+              <small>Costo de Mercadería</small>
+              <strong>$519.750</strong>
+              <em>35.0% del total vendido</em>
             </div>
-            <div className="k-finance-mock-val">$519.750</div>
-            <div className="k-finance-mock-sub">35.0% del total vendido</div>
-          </div>
+          </article>
 
-          <div className="k-card k-finance-card-mock">
-            <div className="k-finance-mock-head">
-              <span>Ganancia Bruta Operativa</span>
-              <Sparkles size={16} />
+          <article>
+            <span className="orange"><Sparkles size={20} /></span>
+            <div>
+              <small>Ganancia Bruta Operativa</small>
+              <strong>$965.250</strong>
+              <em>Margen bruto 65.0%</em>
             </div>
-            <div className="k-finance-mock-val">$965.250</div>
-            <div className="k-finance-mock-sub">Margen bruto 65.0%</div>
-          </div>
-
-          <div className="k-card k-finance-card-mock">
-            <div className="k-finance-mock-head">
-              <span>Ticket Promedio</span>
-              <ChefHat size={16} />
-            </div>
-            <div className="k-finance-mock-val">$18.200</div>
-            <div className="k-finance-mock-sub">~12 empanadas por comanda</div>
-          </div>
+          </article>
         </div>
 
-        <div className="k-finance-charts-mock">
-          <div className="k-card k-finance-card-mock">
-            <span className="k-eyebrow">DISTRIBUCIÓN DE MEDIOS DE PAGO</span>
-            <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Efectivo vs. Transferencias</h3>
-            <div className="k-finance-bar-mock">
-              <div className="k-bar-cash" style={{ width: "58%" }}>58% Efectivo</div>
-              <div className="k-bar-transfer" style={{ width: "42%" }}>42% Transferencia</div>
+        <div className="k-overview-grid">
+          <div className="k-card">
+            <div className="k-card-head">
+              <div>
+                <span className="k-eyebrow">DISTRIBUCIÓN</span>
+                <h2>Medios de Pago</h2>
+              </div>
             </div>
-            <small className="k-mock-foot">Métricas actualizadas automáticamente con cada comanda confirmada.</small>
+            <div style={{ padding: "18px" }}>
+              <div style={{ display: "flex", height: "36px", borderRadius: "8px", overflow: "hidden", fontSize: "11px", fontWeight: "750", color: "#fff", textAlign: "center", lineHeight: "36px" }}>
+                <div style={{ width: "58%", background: "var(--k-green)" }}>58% Efectivo</div>
+                <div style={{ width: "42%", background: "#2970b8" }}>42% Transferencia</div>
+              </div>
+            </div>
           </div>
 
-          <div className="k-card k-finance-card-mock">
-            <span className="k-eyebrow">VARIEDADES MÁS VENDIDAS</span>
-            <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Ranking de Ventas y Márgenes</h3>
-            <ul className="k-finance-rank-mock">
-              <li><span>1. Vacío y provoleta</span><strong>$342.000</strong></li>
-              <li><span>2. Carne cortada a cuchillo</span><strong>$286.000</strong></li>
-              <li><span>3. Jamón y queso</span><strong>$218.400</strong></li>
-              <li><span>4. Osobuco al vino tinto</span><strong>$198.000</strong></li>
-            </ul>
+          <div className="k-card">
+            <div className="k-card-head">
+              <div>
+                <span className="k-eyebrow">RENDIMIENTO</span>
+                <h2>Variedades más vendidas</h2>
+              </div>
+            </div>
+            <div style={{ padding: "0 18px 12px" }}>
+              <div className="k-mini-order" style={{ gridTemplateColumns: "1fr auto" }}>
+                <span>1. Vacío y provoleta</span>
+                <strong>$342.000</strong>
+              </div>
+              <div className="k-mini-order" style={{ gridTemplateColumns: "1fr auto" }}>
+                <span>2. Carne cortada a cuchillo</span>
+                <strong>$286.000</strong>
+              </div>
+              <div className="k-mini-order" style={{ gridTemplateColumns: "1fr auto", borderBottom: 0 }}>
+                <span>3. Jamón y queso</span>
+                <strong>$218.400</strong>
+              </div>
+            </div>
           </div>
         </div>
       </div>
