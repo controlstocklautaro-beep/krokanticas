@@ -1366,7 +1366,7 @@
 /* ==========================================================================
    FINANZAS & APOC AUTOMATION MÓDULO PRO (BLOQUEADO)
    ========================================================================== */
-.k-nav-lock-badge { margin-left:auto; padding:2px 7px; border-radius:6px; font-size:9px; font-weight:800; background:#faebca; color:#8b641f; letter-spacing:.02em; }
+.k-nav-lock-pill { margin-left:auto; display:inline-flex; align-items:center; gap:3px; padding:3px 6px; border-radius:6px; font-size:8px; font-weight:800; color:#fa7234; background:#3e2417; border:1px solid #57311e; letter-spacing:.05em; white-space:nowrap; flex-shrink:0; }
 .k-pro-lock-banner { display:flex; align-items:flex-start; gap:20px; padding:26px; border-radius:18px; background:linear-gradient(135deg, #fffbf8 0%, #fff2e6 100%); border:2px dashed #f0c39f; box-shadow:0 10px 32px #4a32170f; margin-bottom:24px; position:relative; }
 .k-pro-lock-icon { width:62px; height:62px; display:grid; place-items:center; flex-shrink:0; border-radius:18px; background:linear-gradient(135deg, #fa7234 0%, #d85114 100%); color:#fff; box-shadow:0 8px 24px #fa723440; }
 .k-pro-lock-content { flex:1; }

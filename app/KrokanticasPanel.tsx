@@ -6,6 +6,7 @@ import {
   Bell,
   Boxes,
   Calendar,
+  Check,
   ChefHat,
   ChevronLeft,
   ChevronRight,
@@ -355,7 +356,11 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
                           <SectionIcon size={19} strokeWidth={1.9} aria-hidden />
                         </span>
                         {section.label}
-                        {section.id === "finances" && <span className="k-nav-lock-badge">🔒 Bloqueado</span>}
+                        {section.id === "finances" && (
+                          <span className="k-nav-lock-pill">
+                            <Lock size={10} strokeWidth={2.4} aria-hidden /> PRO
+                          </span>
+                        )}
                         {["kitchen", "handoffs"].includes(section.id) && (
                           <b className="k-notification-dot" aria-label="Hay actividad" />
                         )}
@@ -1308,25 +1313,25 @@ function KitchenModule({ businessId }: { businessId: string }) {
 
         <div className="k-month-stats">
           <span className="k-month-stat-chip">
-            📦 <strong>{monthMetrics.totalOrders}</strong> total
+            Total: <strong>{monthMetrics.totalOrders}</strong>
           </span>
           <span className="k-month-stat-chip k-chip-pending">
-            ⏳ <strong>{monthMetrics.pendingOrders}</strong> pendientes
+            Pendientes: <strong>{monthMetrics.pendingOrders}</strong>
           </span>
           <span className="k-month-stat-chip k-chip-kitchen">
-            👨‍🍳 <strong>{monthMetrics.inKitchenOrders}</strong> en cocina
+            En cocina: <strong>{monthMetrics.inKitchenOrders}</strong>
           </span>
           <span className="k-month-stat-chip k-chip-ready">
-            🛎️ <strong>{monthMetrics.readyOrders}</strong> listos
+            Listos: <strong>{monthMetrics.readyOrders}</strong>
           </span>
           <span className="k-month-stat-chip k-chip-delivered">
-            ✅ <strong>{monthMetrics.deliveredOrders}</strong> entregados
+            Entregados: <strong>{monthMetrics.deliveredOrders}</strong>
           </span>
           <span className="k-month-stat-chip">
-            🥟 <strong>{monthMetrics.totalEmpanadas}</strong> empanadas
+            <strong>{monthMetrics.totalEmpanadas}</strong> empanadas
           </span>
           <span className="k-month-stat-chip highlight">
-            💰 <strong>{money(monthMetrics.totalRevenue)}</strong>
+            <strong>{money(monthMetrics.totalRevenue)}</strong>
           </span>
           {selectedMonth !== getCurrentMonthKey() && (
             <button
@@ -2032,7 +2037,7 @@ function FinancesModule() {
     <div className="k-module">
       <div className="k-heading">
         <div>
-          <span className="k-eyebrow">🔒 FUNCIÓN BLOQUEADA · PLAN ACTUAL</span>
+          <span className="k-eyebrow">FUNCIÓN BLOQUEADA · PLAN ACTUAL</span>
           <h1>Finanzas y Rendimiento</h1>
           <p>Control de caja, análisis de costos, ticket promedio y cálculo de rentabilidad en tiempo real.</p>
         </div>
@@ -2041,11 +2046,11 @@ function FinancesModule() {
       {/* Banner Principal de Bloqueo y Desbloqueo */}
       <div className="k-pro-lock-banner">
         <div className="k-pro-lock-icon">
-          <Lock size={30} />
+          <Lock size={30} strokeWidth={2.2} aria-hidden />
         </div>
         <div className="k-pro-lock-content">
           <div className="k-pro-pill locked">
-            <Lock size={13} />
+            <Lock size={11} strokeWidth={2.4} aria-hidden />
             <span>MÓDULO BLOQUEADO · EXCLUSIVO PRO</span>
           </div>
           <h2>Desbloqueá el Control Financiero Inteligente</h2>
@@ -2054,10 +2059,22 @@ function FinancesModule() {
           </p>
 
           <ul className="k-pro-unlock-features">
-            <li><span>✔</span> <strong>Arqueo y balance automático:</strong> discriminación de cobros en efectivo vs. transferencias.</li>
-            <li><span>✔</span> <strong>Costeo de mercadería:</strong> cálculo automático del costo unitario y margen bruto por empanada.</li>
-            <li><span>✔</span> <strong>Reportes contables:</strong> exportación mensual para administración o contador.</li>
-            <li><span>✔</span> <strong>Ticket promedio y picos de venta:</strong> analítica de los días y horarios con mayor facturación.</li>
+            <li>
+              <Check size={14} strokeWidth={2.6} aria-hidden />
+              <span><strong>Arqueo y balance automático:</strong> discriminación de cobros en efectivo vs. transferencias.</span>
+            </li>
+            <li>
+              <Check size={14} strokeWidth={2.6} aria-hidden />
+              <span><strong>Costeo de mercadería:</strong> cálculo automático del costo unitario y margen bruto por empanada.</span>
+            </li>
+            <li>
+              <Check size={14} strokeWidth={2.6} aria-hidden />
+              <span><strong>Reportes contables:</strong> exportación mensual para administración o contador.</span>
+            </li>
+            <li>
+              <Check size={14} strokeWidth={2.6} aria-hidden />
+              <span><strong>Ticket promedio y picos de venta:</strong> analítica de los días y horarios con mayor facturación.</span>
+            </li>
           </ul>
 
           <div className="k-pro-apoc-box">
@@ -2071,7 +2088,8 @@ function FinancesModule() {
               rel="noreferrer"
               className="k-primary k-btn-apoc"
             >
-              💬 Desbloquear por WhatsApp (Apoc Automation)
+              <MessageCircle size={16} strokeWidth={2.2} aria-hidden />
+              <span>Desbloquear por WhatsApp (Apoc Automation)</span>
             </a>
           </div>
         </div>
@@ -2081,7 +2099,7 @@ function FinancesModule() {
       <div className="k-finance-locked-container">
         <div className="k-finance-blur-overlay">
           <div className="k-lock-badge-floating">
-            <Lock size={18} />
+            <Lock size={16} strokeWidth={2.2} aria-hidden />
             <span>Vista previa bloqueada · Requiere activación</span>
           </div>
         </div>
