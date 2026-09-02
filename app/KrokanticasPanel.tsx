@@ -242,7 +242,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
 
   const name = user.displayName.includes("@") ? `Equipo ${business.name}` : user.displayName;
   const visibleSections = sections.filter((section) => {
-    if (section.id === "overview") return true;
+    if (section.id === "overview" || section.id === "finances") return true;
     if (["users", "settings"].includes(section.id) && !["owner", "admin"].includes(user.role)) return false;
     return business.modules.length === 0 || business.modules.includes(section.id);
   });
