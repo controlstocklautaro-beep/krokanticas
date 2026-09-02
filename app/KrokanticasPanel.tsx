@@ -50,7 +50,7 @@ type Business = { id: string; name: string; modules: string[] };
 type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null; made_to_order: boolean; requires_human?: boolean };
 type Contact = { id: string; name: string; phone_number: string; address?: string | null };
 type OrderItem = { id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number };
-type Order = { id: string; contact_id: string; order_number: number; customer_name: string; phone_number: string; delivery_type: "pickup" | "delivery"; address?: string | null; zone?: string | null; payment_method: "cash" | "transfer"; scheduled_time: string; subtotal: number; shipping_cost: number; total: number; status: "confirmed" | "in_kitchen" | "ready" | "delivered" | "cancelled"; receipt_url?: string | null; notes?: string | null; created_at: number; items: OrderItem[] };
+type Order = { id: string; contact_id: string; order_number: number; customer_name: string; phone_number: string; delivery_type: "pickup" | "delivery"; address?: string | null; zone?: string | null; payment_method: "cash" | "transfer" | "pending"; scheduled_time: string; subtotal: number; shipping_cost: number; total: number; status: "confirmed" | "in_kitchen" | "ready" | "delivered" | "cancelled"; receipt_url?: string | null; notes?: string | null; created_at: number; items: OrderItem[] };
 type AliasInfo = { alias: string; bank: string; holder: string; active: boolean };
 type ShippingZone = { name: string; cost: number };
 type Settings = {
@@ -1392,7 +1392,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
               </div>
 
               <div className="k-order-meta">
-                <span>{order.payment_method === "transfer" ? "Transferencia" : "Efectivo"}</span>
+                <span>{order.payment_method === "transfer" ? "Transferencia" : order.payment_method === "pending" ? "A definir" : "Efectivo"}</span>
                 {order.zone && <span>{order.zone}</span>}
                 <strong>{money(order.total)}</strong>
               </div>
@@ -1533,6 +1533,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
                 <select name="paymentMethod" defaultValue={editing.payment_method}>
                   <option value="cash">Efectivo</option>
                   <option value="transfer">Transferencia</option>
+                  <option value="pending">A definir</option>
                 </select>
               </label>
             </div>

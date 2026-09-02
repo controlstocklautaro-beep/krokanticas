@@ -29,8 +29,8 @@ type OrderInput = {
   direccion?: string;
   zone?: string;
   zona?: string;
-  paymentMethod?: "cash" | "transfer";
-  payment_method?: "cash" | "transfer";
+  paymentMethod?: "cash" | "transfer" | "pending";
+  payment_method?: "cash" | "transfer" | "pending";
   time?: string;
   horario?: string;
   scheduledTime?: string;
@@ -131,7 +131,7 @@ function parseDeliveryType(val: unknown): "delivery" | "pickup" {
   return "pickup";
 }
 
-function parsePaymentMethod(val: unknown): "transfer" | "cash" {
+function parsePaymentMethod(val: unknown): "transfer" | "cash" | "pending" {
   if (!val) return "cash";
   const str = String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   if (
@@ -144,6 +144,17 @@ function parsePaymentMethod(val: unknown): "transfer" | "cash" {
     str.includes("transf")
   ) {
     return "transfer";
+  }
+  if (
+    str === "pending" ||
+    str === "a definir" ||
+    str === "a definir en el local" ||
+    str === "en el local" ||
+    str === "sin definir" ||
+    str === "por definir" ||
+    str === "pendiente"
+  ) {
+    return "pending";
   }
   return "cash";
 }
@@ -254,6 +265,25 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     if (!product) {
       // Coincidencia parcial
       product = allProducts.find((p) => normalizeText(p.name).includes(normKey) || normKey.includes(normalizeText(p.name)));
+    }
+
+    // Fallback: si productKey era un ID no encontrado pero vino name / product_name / variedad
+    if (!product) {
+      const fallbackName = String(raw.name || raw.productName || raw.product_name || raw.variedad || raw.sabor || "").trim();
+      if (fallbackName && fallbackName !== productKey) {
+        const normFallback = normalizeText(fallbackName);
+        product = allProducts.find((p) => p.id === fallbackName)
+          || allProducts.find((p) => normalizeText(p.name) === normFallback)
+          || allProducts.find((p) => {
+            try {
+              const aliases: string[] = JSON.parse(p.aliases || "[]");
+              return aliases.some((a) => normalizeText(a) === normFallback);
+            } catch {
+              return false;
+            }
+          })
+          || allProducts.find((p) => normalizeText(p.name).includes(normFallback) || normFallback.includes(normalizeText(p.name)));
+      }
     }
 
     if (!product) {
@@ -418,6 +448,28 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
             return aliases.some((a) => normalizeText(a) === normKey);
           } catch { return false; }
         });
+      if (!product) {
+        // Coincidencia parcial
+        product = allProducts.find((p) => normalizeText(p.name).includes(normKey) || normKey.includes(normalizeText(p.name)));
+      }
+
+      // Fallback: si productKey era un ID no encontrado pero vino name / product_name / variedad
+      if (!product) {
+        const fallbackName = String(raw.name || raw.productName || raw.product_name || raw.variedad || raw.sabor || "").trim();
+        if (fallbackName && fallbackName !== productKey) {
+          const normFallback = normalizeText(fallbackName);
+          product = allProducts.find((p) => p.id === fallbackName)
+            || allProducts.find((p) => normalizeText(p.name) === normFallback)
+            || allProducts.find((p) => {
+              try {
+                const aliases: string[] = JSON.parse(p.aliases || "[]");
+                return aliases.some((a) => normalizeText(a) === normFallback);
+              } catch {
+                return false;
+              }
+            })
+            || allProducts.find((p) => normalizeText(p.name).includes(normFallback) || normFallback.includes(normalizeText(p.name)));
+        }
       }
       if (!product) throw new ApiError(`Variedad "${productKey}" no encontrada`, 404);
 
