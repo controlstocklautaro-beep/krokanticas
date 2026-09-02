@@ -5,7 +5,10 @@ import {
   AlertTriangle,
   Bell,
   Boxes,
+  Calendar,
   ChefHat,
+  ChevronLeft,
+  ChevronRight,
   ContactRound,
   HandHelping,
   House,
@@ -949,10 +952,33 @@ function ProductPicker({ products, items, onChange, includeSoldout = false }: { 
   return <fieldset className="k-product-picker"><legend>Productos</legend>{products.filter((product) => includeSoldout || product.stock_status !== "soldout").map((product) => { const quantity = items[product.id] || 0; return <div className={product.stock_status === "soldout" ? "soldout" : ""} key={product.id}><span><strong>{product.name}</strong>{product.description && <em className="k-picker-description">{product.description}</em>}{product.made_to_order && <em className="k-picker-human">Por encargo · requiere atención humana</em>}<small>{money(product.price)}{product.stock_status === "limited" ? ` · quedan ${product.stock_quantity}` : product.stock_status === "soldout" ? " · agotada" : ""}</small></span><div className="k-stepper"><button type="button" onClick={() => onChange({ ...items, [product.id]: Math.max(0, quantity - 1) })}>−</button><b>{quantity}</b><button type="button" disabled={product.stock_status === "soldout" && quantity === 0} onClick={() => onChange({ ...items, [product.id]: quantity + 1 })}>＋</button></div></div>; })}</fieldset>;
 }
 
+const MONTH_NAMES_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+function getCurrentMonthKey(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function formatMonthLabel(monthKey: string): string {
+  if (!monthKey || monthKey === "all") return "Todos los meses";
+  const [yearStr, monthStr] = monthKey.split("-");
+  const year = Number(yearStr);
+  const monthIndex = Number(monthStr) - 1;
+  const name = MONTH_NAMES_ES[monthIndex] || monthStr;
+  const current = getCurrentMonthKey();
+  return monthKey === current ? `${name} ${year} (Mes actual)` : `${name} ${year}`;
+}
+
 function KitchenModule({ businessId }: { businessId: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => getCurrentMonthKey());
   const [filter, setFilter] = useState("active");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -1002,9 +1028,56 @@ function KitchenModule({ businessId }: { businessId: string }) {
     };
   }, [businessId]);
 
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    const currentKey = getCurrentMonthKey();
+    set.add(currentKey);
+    for (const o of orders) {
+      if (o.created_at) {
+        const d = new Date(Number(o.created_at));
+        if (!isNaN(d.getTime())) {
+          set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        }
+      }
+    }
+    return Array.from(set).sort().reverse();
+  }, [orders]);
+
+  const monthOrders = useMemo(() => {
+    if (selectedMonth === "all") return orders;
+    return orders.filter((order) => {
+      if (!order.created_at) return false;
+      const d = new Date(Number(order.created_at));
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return key === selectedMonth;
+    });
+  }, [orders, selectedMonth]);
+
+  const monthMetrics = useMemo(() => {
+    const totalOrders = monthOrders.length;
+    const nonCancelled = monthOrders.filter((o) => o.status !== "cancelled");
+    const totalRevenue = nonCancelled.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const totalEmpanadas = nonCancelled.reduce(
+      (sum, o) => sum + o.items.reduce((iSum, it) => iSum + Number(it.quantity || 0), 0),
+      0
+    );
+    return { totalOrders, totalRevenue, totalEmpanadas };
+  }, [monthOrders]);
+
+  function changeMonthBy(delta: number) {
+    if (selectedMonth === "all") {
+      setSelectedMonth(getCurrentMonthKey());
+      return;
+    }
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const date = new Date(y, m - 1 + delta, 1);
+    const newKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    setSelectedMonth(newKey);
+  }
+
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return orders.filter(
+    return monthOrders.filter(
       (order) =>
         (filter === "all" || (filter === "active" && !["delivered", "cancelled"].includes(order.status)) || order.status === filter) &&
         (!term ||
@@ -1012,7 +1085,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
           order.phone_number.includes(term) ||
           String(order.order_number).includes(term))
     );
-  }, [orders, filter, search]);
+  }, [monthOrders, filter, search]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1139,6 +1212,64 @@ function KitchenModule({ businessId }: { businessId: string }) {
       </div>
 
       {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
+
+      {/* Selector y Resumen Mensual */}
+      <div className="k-month-bar">
+        <div className="k-month-selector">
+          <Calendar size={18} style={{ color: "var(--k-orange)", flexShrink: 0 }} aria-hidden />
+          <button
+            type="button"
+            className="k-month-nav-btn"
+            title="Mes anterior"
+            disabled={selectedMonth === "all"}
+            onClick={() => changeMonthBy(-1)}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            aria-label="Filtrar por mes"
+          >
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {formatMonthLabel(m)}
+              </option>
+            ))}
+            <option value="all">Ver todos los meses</option>
+          </select>
+          <button
+            type="button"
+            className="k-month-nav-btn"
+            title="Mes siguiente"
+            disabled={selectedMonth === "all"}
+            onClick={() => changeMonthBy(1)}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        <div className="k-month-stats">
+          <span className="k-month-stat-chip">
+            📦 <strong>{monthMetrics.totalOrders}</strong> pedidos
+          </span>
+          <span className="k-month-stat-chip">
+            🥟 <strong>{monthMetrics.totalEmpanadas}</strong> empanadas
+          </span>
+          <span className="k-month-stat-chip highlight">
+            💰 <strong>{money(monthMetrics.totalRevenue)}</strong>
+          </span>
+          {selectedMonth !== getCurrentMonthKey() && (
+            <button
+              type="button"
+              className="k-today-btn"
+              onClick={() => setSelectedMonth(getCurrentMonthKey())}
+            >
+              Volver al mes actual
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="k-kitchen-tools">
         <div className="k-tabs">

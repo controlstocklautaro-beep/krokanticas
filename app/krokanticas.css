@@ -410,6 +410,18 @@
 .k-integration-list > div:last-child { border-right:0; }
 .k-integration-list span { color:var(--k-brown); font-size:12px; font-weight:750; }
 .k-integration-list b { width:max-content; max-width:100%; padding:5px 8px; border-radius:12px; color:#8b641f; background:#faebca; font-size:9px; font-weight:750; }
+.k-month-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; padding:10px 16px; border:1px solid var(--k-line); border-radius:12px; background:#fff; box-shadow:0 4px 18px #4a321708; }
+.k-month-selector { display:flex; align-items:center; gap:8px; background:var(--k-cream,#faf7f1); padding:6px 12px; border-radius:9px; border:1px solid var(--k-line); }
+.k-month-selector select { border:none; background:transparent; font-size:13px; font-weight:750; color:var(--k-brown); outline:none; cursor:pointer; }
+.k-month-nav-btn { width:28px; height:28px; display:grid; place-items:center; border:1px solid var(--k-line); border-radius:7px; background:#fff; color:var(--k-brown); cursor:pointer; transition:all .15s; }
+.k-month-nav-btn:hover:not(:disabled) { border-color:var(--k-orange); color:var(--k-orange); background:#fff5ed; }
+.k-month-nav-btn:disabled { opacity:.35; cursor:not-allowed; }
+.k-month-stats { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.k-month-stat-chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:8px; font-size:12px; color:var(--k-brown); background:#faf7f1; border:1px solid var(--k-line); }
+.k-month-stat-chip strong { font-weight:800; }
+.k-month-stat-chip.highlight { background:#e6f4ed; border-color:#c0e6d1; color:#176f45; }
+.k-today-btn { padding:5px 12px; border:1px solid var(--k-orange); border-radius:8px; background:#fff5ed; color:var(--k-orange); font-size:11px; font-weight:750; cursor:pointer; transition:all .15s; }
+.k-today-btn:hover { background:var(--k-orange); color:#fff; }
 .k-kitchen-tools { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
 .k-kitchen-tools .k-tabs { margin-bottom:0; }
 .k-kitchen-tools .k-search { width:min(340px,100%); flex:0 1 340px; }
@@ -447,6 +459,9 @@
 }
 
 @media (max-width:780px) {
+  .k-month-bar { flex-direction:column; align-items:stretch; }
+  .k-month-selector { justify-content:space-between; }
+  .k-month-stats { justify-content:flex-start; }
   .k-kitchen-tools { align-items:stretch; flex-direction:column; }
   .k-kitchen-tools .k-search { width:100%; flex-basis:auto; }
   .k-handoff-grid { grid-template-columns:1fr; }
