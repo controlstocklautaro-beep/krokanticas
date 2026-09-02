@@ -9,16 +9,20 @@ import {
   ChefHat,
   ChevronLeft,
   ChevronRight,
+  CircleDollarSign,
   ContactRound,
   HandHelping,
   House,
+  Lock,
   MapPin,
   Menu,
   MessageCircle,
   Package,
   Search,
   Settings as SettingsIcon,
+  Sparkles,
   Trash2,
+  TrendingUp,
   UsersRound,
   Volume2,
   VolumeX,
@@ -39,7 +43,7 @@ import {
   unlockAudio,
 } from "@/lib/client/sound-and-notifications";
 
-type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "settings" | "users";
+type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "finances" | "settings" | "users";
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Business = { id: string; name: string; modules: string[] };
 type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null; made_to_order: boolean; requires_human?: boolean };
@@ -73,6 +77,7 @@ const sections: { id: Section; label: string; icon: LucideIcon; group: string }[
   { id: "overview", label: "Inicio", icon: House, group: "OPERACIÓN" },
   { id: "kitchen", label: "Cocina", icon: ChefHat, group: "OPERACIÓN" },
   { id: "stock", label: "Stock", icon: Boxes, group: "OPERACIÓN" },
+  { id: "finances", label: "Finanzas", icon: CircleDollarSign, group: "OPERACIÓN" },
   { id: "messages", label: "Conversaciones", icon: MessageCircle, group: "ATENCIÓN" },
   { id: "handoffs", label: "Derivaciones", icon: HandHelping, group: "ATENCIÓN" },
   { id: "contacts", label: "Contactos", icon: ContactRound, group: "ATENCIÓN" },
@@ -339,6 +344,7 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
         {active === "overview" && <Overview businessId={business.id} onNavigate={choose} />}
         {active === "kitchen" && <KitchenModule businessId={business.id} />}
         {active === "stock" && <StockModule businessId={business.id} />}
+        {active === "finances" && <FinancesModule />}
         {active === "messages" && <div className="k-module"><MessagesModule businessId={business.id} /></div>}
         {active === "handoffs" && <HandoffsModule businessId={business.id} />}
         {active === "contacts" && <div className="k-module"><CustomersModule businessId={business.id} /></div>}
@@ -1032,6 +1038,15 @@ function KitchenModule({ businessId }: { businessId: string }) {
     const set = new Set<string>();
     const currentKey = getCurrentMonthKey();
     set.add(currentKey);
+    if (selectedMonth && selectedMonth !== "all") {
+      set.add(selectedMonth);
+    }
+    // Generar los últimos 12 meses para que el selector siempre tenga las opciones visibles al navegar
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
     for (const o of orders) {
       if (o.created_at) {
         const d = new Date(Number(o.created_at));
@@ -1041,7 +1056,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
       }
     }
     return Array.from(set).sort().reverse();
-  }, [orders]);
+  }, [orders, selectedMonth]);
 
   const monthOrders = useMemo(() => {
     if (selectedMonth === "all") return orders;
@@ -1061,7 +1076,19 @@ function KitchenModule({ businessId }: { businessId: string }) {
       (sum, o) => sum + o.items.reduce((iSum, it) => iSum + Number(it.quantity || 0), 0),
       0
     );
-    return { totalOrders, totalRevenue, totalEmpanadas };
+    const pendingOrders = monthOrders.filter((o) => o.status === "confirmed").length;
+    const inKitchenOrders = monthOrders.filter((o) => o.status === "in_kitchen").length;
+    const readyOrders = monthOrders.filter((o) => o.status === "ready").length;
+    const deliveredOrders = monthOrders.filter((o) => o.status === "delivered").length;
+    return {
+      totalOrders,
+      totalRevenue,
+      totalEmpanadas,
+      pendingOrders,
+      inKitchenOrders,
+      readyOrders,
+      deliveredOrders,
+    };
   }, [monthOrders]);
 
   function changeMonthBy(delta: number) {
@@ -1251,7 +1278,19 @@ function KitchenModule({ businessId }: { businessId: string }) {
 
         <div className="k-month-stats">
           <span className="k-month-stat-chip">
-            📦 <strong>{monthMetrics.totalOrders}</strong> pedidos
+            📦 <strong>{monthMetrics.totalOrders}</strong> total
+          </span>
+          <span className="k-month-stat-chip k-chip-pending">
+            ⏳ <strong>{monthMetrics.pendingOrders}</strong> pendientes
+          </span>
+          <span className="k-month-stat-chip k-chip-kitchen">
+            👨‍🍳 <strong>{monthMetrics.inKitchenOrders}</strong> en cocina
+          </span>
+          <span className="k-month-stat-chip k-chip-ready">
+            🛎️ <strong>{monthMetrics.readyOrders}</strong> listos
+          </span>
+          <span className="k-month-stat-chip k-chip-delivered">
+            ✅ <strong>{monthMetrics.deliveredOrders}</strong> entregados
           </span>
           <span className="k-month-stat-chip">
             🥟 <strong>{monthMetrics.totalEmpanadas}</strong> empanadas
@@ -1946,6 +1985,119 @@ function SettingsModule({ businessId }: { businessId: string }) {
           >
             {saving ? "Guardando..." : "Guardar Tarifas de Envío"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FinancesModule() {
+  const whatsappUrl =
+    "https://wa.me/5493516579655?text=" +
+    encodeURIComponent(
+      "¡Hola! Me comunico desde el panel de Krokanticas para consultar sobre la activación del módulo premium de Finanzas y Reportes con Apoc Automation."
+    );
+
+  return (
+    <div className="k-module">
+      <div className="k-heading">
+        <div>
+          <span className="k-eyebrow">INTEGRACIÓN PREMIUM · APOC AUTOMATION</span>
+          <h1>Finanzas y Rendimiento</h1>
+          <p>Control de caja, análisis de costos, ticket promedio y cálculo de rentabilidad en tiempo real.</p>
+        </div>
+      </div>
+
+      {/* Banner Principal de Construcción y Activación */}
+      <div className="k-pro-lock-banner">
+        <div className="k-pro-lock-icon">
+          <Lock size={28} />
+        </div>
+        <div className="k-pro-lock-content">
+          <div className="k-pro-pill">
+            <Sparkles size={14} />
+            <span>MÓDULO EN CONSTRUCCIÓN / ADICIONAL PREMIUM</span>
+          </div>
+          <h2>Automatizá y controlá los números de tu negocio</h2>
+          <p>
+            El módulo de Finanzas te permitirá visualizar balances automáticos de cobranzas (efectivo vs. transferencias), control de stock de insumos, costo unitario por empanada, cálculo de ganancia neta diaria y reportes exportables para el contador.
+          </p>
+          <div className="k-pro-apoc-box">
+            <div>
+              <strong>¿Querés incorporar este módulo a tu panel?</strong>
+              <span>Contactate con <b>Apoc Automation</b> para activarlo como funcionalidad adicional en tu plan.</span>
+            </div>
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="k-primary k-btn-apoc"
+            >
+              🚀 Contactar a Apoc Automation
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Mockup visual en tonos grises / desactivado */}
+      <div className="k-finance-preview-grid">
+        <div className="k-card k-finance-card-mock">
+          <div className="k-finance-mock-head">
+            <span>Ingresos Totales (Mes)</span>
+            <TrendingUp size={16} />
+          </div>
+          <div className="k-finance-mock-val">$1.485.000</div>
+          <div className="k-finance-mock-sub">+18.4% vs mes anterior</div>
+        </div>
+
+        <div className="k-card k-finance-card-mock">
+          <div className="k-finance-mock-head">
+            <span>Costo Estimado de Mercadería</span>
+            <CircleDollarSign size={16} />
+          </div>
+          <div className="k-finance-mock-val">$519.750</div>
+          <div className="k-finance-mock-sub">35.0% del total vendido</div>
+        </div>
+
+        <div className="k-card k-finance-card-mock">
+          <div className="k-finance-mock-head">
+            <span>Ganancia Bruta Operativa</span>
+            <Sparkles size={16} />
+          </div>
+          <div className="k-finance-mock-val">$965.250</div>
+          <div className="k-finance-mock-sub">Margen bruto 65.0%</div>
+        </div>
+
+        <div className="k-card k-finance-card-mock">
+          <div className="k-finance-mock-head">
+            <span>Ticket Promedio</span>
+            <ChefHat size={16} />
+          </div>
+          <div className="k-finance-mock-val">$18.200</div>
+          <div className="k-finance-mock-sub">~12 empanadas por comanda</div>
+        </div>
+      </div>
+
+      <div className="k-finance-charts-mock">
+        <div className="k-card k-finance-card-mock">
+          <span className="k-eyebrow">DISTRIBUCIÓN DE MEDIOS DE PAGO</span>
+          <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Efectivo vs. Transferencias</h3>
+          <div className="k-finance-bar-mock">
+            <div className="k-bar-cash" style={{ width: "58%" }}>58% Efectivo</div>
+            <div className="k-bar-transfer" style={{ width: "42%" }}>42% Transferencia</div>
+          </div>
+          <small className="k-mock-foot">Métricas actualizadas automáticamente con cada comanda confirmada.</small>
+        </div>
+
+        <div className="k-card k-finance-card-mock">
+          <span className="k-eyebrow">VARIEDADES MÁS VENDIDAS</span>
+          <h3 style={{ margin: "6px 0 12px", fontFamily: "Georgia, serif" }}>Ranking de Ventas y Márgenes</h3>
+          <ul className="k-finance-rank-mock">
+            <li><span>1. Vacío y provoleta</span><strong>$342.000</strong></li>
+            <li><span>2. Carne cortada a cuchillo</span><strong>$286.000</strong></li>
+            <li><span>3. Jamón y queso</span><strong>$218.400</strong></li>
+            <li><span>4. Osobuco al vino tinto</span><strong>$198.000</strong></li>
+          </ul>
         </div>
       </div>
     </div>

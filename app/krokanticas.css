@@ -420,6 +420,10 @@
 .k-month-stat-chip { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:8px; font-size:12px; color:var(--k-brown); background:#faf7f1; border:1px solid var(--k-line); }
 .k-month-stat-chip strong { font-weight:800; }
 .k-month-stat-chip.highlight { background:#e6f4ed; border-color:#c0e6d1; color:#176f45; }
+.k-month-stat-chip.k-chip-pending { background:#fef3c7; border-color:#fde68a; color:#92400e; }
+.k-month-stat-chip.k-chip-kitchen { background:#ffedd5; border-color:#fed7aa; color:#c2410c; }
+.k-month-stat-chip.k-chip-ready { background:#e0f2fe; border-color:#bae6fd; color:#0369a1; }
+.k-month-stat-chip.k-chip-delivered { background:#dcfce7; border-color:#bbf7d0; color:#15803d; }
 .k-today-btn { padding:5px 12px; border:1px solid var(--k-orange); border-radius:8px; background:#fff5ed; color:var(--k-orange); font-size:11px; font-weight:750; cursor:pointer; transition:all .15s; }
 .k-today-btn:hover { background:var(--k-orange); color:#fff; }
 .k-kitchen-tools { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
@@ -1357,5 +1361,48 @@
   .k-order-items > div {
     font-size: 11px;
   }
+}
+
+/* ==========================================================================
+   FINANZAS & APOC AUTOMATION MÓDULO PRO
+   ========================================================================== */
+.k-pro-lock-banner { display:flex; align-items:flex-start; gap:20px; padding:24px; border-radius:16px; background:linear-gradient(135deg, #faf7f2 0%, #fff6ee 100%); border:1px dashed #d9b89e; box-shadow:0 8px 30px #4a32170c; margin-bottom:24px; }
+.k-pro-lock-icon { width:58px; height:58px; display:grid; place-items:center; flex-shrink:0; border-radius:16px; background:var(--k-orange,#fa7234); color:#fff; box-shadow:0 8px 20px #fa723433; }
+.k-pro-lock-content { flex:1; }
+.k-pro-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.04em; color:#9c4323; background:#fde5d6; margin-bottom:10px; }
+.k-pro-lock-content h2 { margin:0 0 8px; font-family:Georgia,serif; font-size:22px; color:var(--k-brown,#2e1d13); }
+.k-pro-lock-content p { margin:0 0 16px; color:#5c473b; font-size:13px; line-height:1.55; max-width:820px; }
+.k-pro-apoc-box { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; padding:14px 18px; background:#fff; border:1px solid var(--k-line,#ebdcd0); border-radius:12px; }
+.k-pro-apoc-box > div { display:flex; flex-direction:column; gap:2px; }
+.k-pro-apoc-box strong { font-size:13px; color:var(--k-brown,#2e1d13); }
+.k-pro-apoc-box span { font-size:11px; color:var(--k-muted,#7c685b); }
+.k-btn-apoc { text-decoration:none; display:inline-flex; align-items:center; gap:6px; padding:10px 18px; border-radius:9px; font-size:12px; font-weight:750; color:#fff; background:var(--k-orange,#fa7234); transition:transform .15s, box-shadow .15s; }
+.k-btn-apoc:hover { transform:translateY(-1px); box-shadow:0 6px 16px #fa723440; }
+.k-finance-preview-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; opacity:.85; }
+.k-finance-card-mock { padding:16px 18px; background:#fff; border:1px solid var(--k-line,#ebdcd0); border-radius:12px; }
+.k-finance-mock-head { display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:650; color:var(--k-muted,#7c685b); margin-bottom:8px; }
+.k-finance-mock-val { font-family:Georgia,serif; font-size:24px; font-weight:750; color:var(--k-brown,#2e1d13); margin-bottom:4px; }
+.k-finance-mock-sub { font-size:10px; font-weight:700; color:#176f45; }
+.k-finance-charts-mock { display:grid; grid-template-columns:1fr 1fr; gap:16px; opacity:.85; }
+.k-finance-bar-mock { display:flex; height:38px; border-radius:9px; overflow:hidden; margin:12px 0 10px; font-size:11px; font-weight:750; color:#fff; text-align:center; line-height:38px; }
+.k-bar-cash { background:#258f5c; }
+.k-bar-transfer { background:#2970b8; }
+.k-mock-foot { display:block; font-size:10px; color:var(--k-muted,#7c685b); }
+.k-finance-rank-mock { list-style:none; padding:0; margin:8px 0 0; }
+.k-finance-rank-mock li { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--k-line,#ebdcd0); font-size:12px; }
+.k-finance-rank-mock li:last-child { border-bottom:0; }
+.k-finance-rank-mock span { color:#4a382e; }
+.k-finance-rank-mock strong { color:var(--k-brown,#2e1d13); }
+
+@media (max-width:900px) {
+  .k-finance-preview-grid { grid-template-columns:repeat(2,1fr); }
+  .k-finance-charts-mock { grid-template-columns:1fr; }
+}
+
+@media (max-width:600px) {
+  .k-pro-lock-banner { flex-direction:column; padding:16px; }
+  .k-pro-apoc-box { flex-direction:column; align-items:stretch; }
+  .k-btn-apoc { justify-content:center; }
+  .k-finance-preview-grid { grid-template-columns:1fr; }
 }
 
