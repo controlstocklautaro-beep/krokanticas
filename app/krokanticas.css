@@ -319,6 +319,64 @@
 .k-order-note { padding:13px 18px; font-size:13px; }
 .k-order-actions { gap:7px; padding:13px; }
 .k-order-actions button { min-height:40px; padding-inline:12px; font-size:12px; }
+
+/* ==========================================================================
+   ESTADOS DE COMANDAS: COLORES DIFERENCIADOS (CABECERAS, TEXTOS Y BOTONES)
+   ========================================================================== */
+/* 1. Recién entra / Confirmado (ROJO) */
+.k-order-card.confirmed { border-color:#e0a08a; }
+.k-order-card.confirmed .k-order-head span { color:#a64834; }
+.k-order-card.confirmed .k-order-head b { color:#a64834; background:#fae2dc; }
+.k-order-actions .main.btn-confirmed,
+.k-order-card.confirmed .k-order-actions .main {
+  background: #bd3f27 !important;
+  border-color: #a83520 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(189, 63, 39, 0.28);
+}
+.k-order-actions .main.btn-confirmed:hover,
+.k-order-card.confirmed .k-order-actions .main:hover {
+  background: #a83520 !important;
+}
+
+/* 2. En preparación / En cocina (MARRÓN / DORADO) */
+.k-order-card.in_kitchen { border-color:#dfc79e; }
+.k-order-card.in_kitchen .k-order-head span { color:#8c5c20; }
+.k-order-card.in_kitchen .k-order-head b { color:#8c5c20; background:#f7e4bf; }
+.k-order-actions .main.btn-kitchen,
+.k-order-actions .main.btn-in-kitchen,
+.k-order-card.in_kitchen .k-order-actions .main {
+  background: #b85416 !important;
+  border-color: #9f450e !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(184, 84, 22, 0.28);
+}
+.k-order-actions .main.btn-kitchen:hover,
+.k-order-actions .main.btn-in-kitchen:hover,
+.k-order-card.in_kitchen .k-order-actions .main:hover {
+  background: #9f450e !important;
+}
+
+/* 3. Listo / Listo para entrega (VERDE) */
+.k-order-card.ready { border-color:#9bc9b5; }
+.k-order-card.ready .k-order-head span { color:#1b7a54; }
+.k-order-card.ready .k-order-head b { color:#1b7a54; background:#e2f1ea; }
+.k-order-actions .main.btn-ready,
+.k-order-card.ready .k-order-actions .main {
+  background: #1b7a54 !important;
+  border-color: #146243 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(27, 122, 84, 0.28);
+}
+.k-order-actions .main.btn-ready:hover,
+.k-order-card.ready .k-order-actions .main:hover {
+  background: #146243 !important;
+}
+
+/* 4. Entregado (VERDE) */
+.k-order-card.delivered { border-color:#9bc9b5; }
+.k-order-card.delivered .k-order-head span { color:#1b7a54; }
+.k-order-card.delivered .k-order-head b { color:#1b7a54; background:#e2f1ea; }
 .k-product-picker legend { font-size:14px; }
 .k-product-picker > div { min-height:56px; }
 .k-product-picker strong { font-size:14px; }
