@@ -372,6 +372,12 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
         db.prepare("UPDATE products SET stock_quantity = stock_quantity - ?, stock_status = CASE WHEN stock_quantity - ? <= 0 THEN 'soldout' ELSE 'limited' END, updated_at = ? WHERE id = ? AND business_id = ? AND stock_quantity >= ?")
           .bind(item.quantity, item.quantity, now, item.productId, businessId, item.quantity),
       );
+    } else if (item.stockStatus === "available") {
+      // Productos con stock ilimitado: inicializar stock_quantity si es null y descontar
+      statements.push(
+        db.prepare("UPDATE products SET stock_quantity = CASE WHEN stock_quantity IS NULL THEN -? ELSE stock_quantity - ? END, stock_status = CASE WHEN stock_quantity IS NOT NULL AND stock_quantity - ? <= 0 THEN 'soldout' WHEN stock_quantity IS NOT NULL THEN 'limited' ELSE 'available' END, updated_at = ? WHERE id = ? AND business_id = ?")
+          .bind(item.quantity, item.quantity, item.quantity, now, item.productId, businessId),
+      );
     }
   }
 
