@@ -30,7 +30,7 @@
 .k-pwa-state.offline { color:#9a4b35; background:#fae4dc; }
 
 @media (max-width:1050px) { .k-stock-grid { grid-template-columns:repeat(2,1fr); }.k-overview-grid { grid-template-columns:1fr; } }
-@media (max-width:780px) { .k-sidebar { transform:translateX(-105%); transition:transform .24s ease; }.k-sidebar.open { transform:translateX(0); }.k-overlay { display:block; position:fixed; inset:0; z-index:35; border:0; background:#1a110c99; }.k-main { width:100%; margin-left:0; }.k-topbar { height:59px; padding:0 14px; }.k-menu { display:block; }.k-topbar > div:first-of-type { margin-right:auto; margin-left:10px; }.k-content { padding:22px 14px 50px; }.k-heading { align-items:flex-start; flex-direction:column; margin-bottom:21px; }.k-heading .k-primary,.k-heading .k-search { width:100%; }.k-settings,.k-kpis { grid-template-columns:1fr; }.k-settings button { min-height:84px; }.k-kpis article { min-height:88px; }.k-stock-grid,.k-order-grid { grid-template-columns:1fr; }.k-order-card { border-radius:11px; }.k-order-actions { position:sticky; bottom:0; background:#fff; }.k-order-actions button { min-height:40px; }.k-module .messages-layout { min-height:calc(100vh - 210px); }.k-module .module-heading { align-items:flex-start; flex-direction:column; }.k-module .module-heading .primary { width:100%; }.k-live { display:none; } }
+@media (max-width:780px) { .k-sidebar { transform:translateX(-105%); transition:transform .24s ease; }.k-sidebar.open { transform:translateX(0); }.k-overlay { display:block; position:fixed; inset:0; z-index:35; border:0; background:#1a110c99; }.k-main { width:100%; margin-left:0; }.k-topbar { height:calc(58px + env(safe-area-inset-top, 0px)); padding-top:env(safe-area-inset-top, 0px); padding-bottom:0; padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px)); box-sizing:border-box; }.k-menu { display:grid; place-items:center; width:38px; height:38px; min-width:38px; min-height:38px; border:1px solid var(--k-line); border-radius:9px; background:#fff; color:var(--k-brown); cursor:pointer; flex-shrink:0; }.k-topbar > div:first-of-type { margin-right:auto; margin-left:6px; }.k-content { padding:18px 12px calc(50px + env(safe-area-inset-bottom, 0px)); }.k-heading { align-items:flex-start; flex-direction:column; margin-bottom:21px; }.k-heading .k-primary,.k-heading .k-search { width:100%; }.k-settings,.k-kpis { grid-template-columns:1fr; }.k-settings button { min-height:84px; }.k-kpis article { min-height:88px; }.k-stock-grid,.k-order-grid { grid-template-columns:1fr; }.k-order-card { border-radius:11px; }.k-order-actions { position:sticky; bottom:0; background:#fff; }.k-order-actions button { min-height:40px; }.k-module .messages-layout { min-height:calc(100vh - 210px); }.k-module .module-heading { align-items:flex-start; flex-direction:column; }.k-module .module-heading .primary { width:100%; }.k-live { display:none; } }
 @media (max-width:430px) { .k-heading h1 { font-size:30px; }.k-top-actions { gap:6px; }.k-topbar > div:first-of-type > span,.k-topbar > div:first-of-type > b { display:none; }.k-top-actions .k-install { height:40px; padding:0 10px; }.k-order-actions { flex-wrap:wrap; }.k-order-actions .main { flex-basis:100%; }.k-modal { padding:18px; }.k-product-picker { max-height:205px; } }
 
 /* Readability pass: comfortable sizes for daily desktop and mobile use. */
@@ -1257,11 +1257,72 @@
   }
 }
 
-/* Tablets en vertical y Móviles Grandes */
+/* Tablets en vertical y Móviles Grandes (<= 780px) */
 @media (max-width: 780px) {
+  /* Prevent iOS Safari from zooming when focusing inputs */
+  .k-app input,
+  .k-app select,
+  .k-app textarea,
+  .modal input,
+  .modal select,
+  .modal textarea,
+  .k-config-form input,
+  .k-config-form textarea,
+  .k-search input,
+  .k-zone-edit-row input,
+  .k-wa-composer input {
+    font-size: 16px !important;
+  }
+
+  /* Topbar fija con Safe Area para iPhone (Notch / Dynamic Island) */
+  .k-topbar {
+    height: calc(60px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(60px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: 0 !important;
+    padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #faf7f1ee !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    gap: 8px !important;
+  }
+
+  /* Botón hamburguesa accesible y cómodo */
+  .k-menu {
+    display: grid !important;
+    place-items: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border: 1px solid var(--k-line) !important;
+    border-radius: 9px !important;
+    background: #fff !important;
+    color: var(--k-brown) !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Sidebar con Safe Area superior e inferior */
+  .k-sidebar {
+    width: min(290px, 84vw) !important;
+    padding-top: calc(22px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(16px, env(safe-area-inset-right, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Acciones de cabecera */
   .k-top-actions {
     gap: 8px;
     flex-shrink: 0;
+    align-items: center;
   }
   .k-audio-btn {
     min-height: 36px;
@@ -1269,6 +1330,7 @@
     padding: 0 10px;
     gap: 5px;
     font-size: 11px;
+    border-radius: 9px;
   }
   .k-audio-btn-label {
     display: none;
@@ -1283,19 +1345,339 @@
     font-size: 11px;
     white-space: nowrap;
     flex-shrink: 0;
+    border-radius: 9px;
+  }
+
+  /* Popovers flotantes con safe area */
+  .k-audio-popover {
+    position: fixed !important;
+    top: calc(60px + env(safe-area-inset-top, 0px) + 8px) !important;
+    right: max(10px, env(safe-area-inset-right, 0px)) !important;
+    left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    width: auto !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+  .k-toast-container {
+    top: calc(60px + env(safe-area-inset-top, 0px) + 8px) !important;
+    right: max(10px, env(safe-area-inset-right, 0px)) !important;
+    left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  /* Contenido general con safe area inferior */
+  .k-content {
+    padding-top: 16px !important;
+    padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: calc(65px + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Encabezados */
+  .k-heading {
+    margin-bottom: 18px !important;
+    gap: 12px !important;
+  }
+  .k-heading h1 {
+    font-size: clamp(25px, 6.5vw, 32px) !important;
+    line-height: 1.15 !important;
+  }
+
+  /* ========================================================================
+     APARTADO 1: COCINA / COMANDAS
+     ======================================================================== */
+  .k-tabs {
+    display: flex !important;
+    gap: 6px !important;
+    margin-bottom: 14px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    padding-bottom: 4px !important;
+  }
+  .k-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+  .k-tabs button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    height: 38px !important;
+    padding: 0 14px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    border-radius: 9px !important;
+  }
+
+  .k-order-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .k-order-card {
+    border-radius: 14px !important;
+  }
+  .k-order-head {
+    min-height: 52px !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
+  }
+  .k-order-head span {
+    font-size: 13px !important;
+  }
+  .k-order-head b {
+    font-size: 10px !important;
+    padding: 5px 8px !important;
+  }
+  .k-order-head time {
+    font-size: 19px !important;
+  }
+  .k-order-person {
+    padding: 12px 14px 8px !important;
+  }
+  .k-order-person h2 {
+    font-size: 17px !important;
+  }
+  .k-order-items {
+    padding: 6px 14px 10px !important;
+  }
+  .k-order-meta {
+    padding: 10px 14px !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .k-order-meta strong {
+    margin-left: auto !important;
+    font-size: 17px !important;
+  }
+  .k-order-actions {
+    padding: 10px 12px !important;
+    gap: 6px !important;
+    position: sticky !important;
+    bottom: 0 !important;
+    background: #fff !important;
+    border-top: 1px solid var(--k-line) !important;
+    z-index: 5 !important;
+  }
+  .k-order-actions button {
+    min-height: 44px !important;
+    font-size: 12px !important;
+    font-weight: 750 !important;
+    border-radius: 8px !important;
+  }
+  .k-order-actions .main {
+    flex: 2 !important;
+  }
+
+  /* ========================================================================
+     APARTADO 2: STOCK / CATÁLOGO
+     ======================================================================== */
+  .k-stock-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .k-stock-card {
+    border-radius: 14px !important;
+    padding: 16px !important;
+  }
+  .k-stepper {
+    gap: 8px !important;
+  }
+  .k-stepper button {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    font-size: 18px !important;
+    border-radius: 9px !important;
+    display: grid !important;
+    place-items: center !important;
+    touch-action: manipulation !important;
+  }
+  .k-stepper strong, .k-stepper b {
+    font-size: 16px !important;
+    min-width: 24px !important;
+    text-align: center !important;
+  }
+  .k-stock-bottom .k-edit {
+    min-height: 38px !important;
+    padding: 0 14px !important;
+    font-size: 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    border-radius: 8px !important;
+  }
+
+  /* ========================================================================
+     APARTADO 3: INICIO / OVERVIEW
+     ======================================================================== */
+  .k-settings {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .k-settings button {
+    min-height: 80px !important;
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+  }
+  .k-kpis {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .k-kpis article {
+    min-height: 80px !important;
+    padding: 14px 16px !important;
+    border-radius: 12px !important;
+  }
+  .k-overview-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .k-quick button {
+    min-height: 58px !important;
+    padding: 10px !important;
+  }
+
+  /* ========================================================================
+     APARTADO 4: WHATSAPP / MENSAJES
+     ======================================================================== */
+  .k-wa-container {
+    height: calc(100dvh - 60px - env(safe-area-inset-top, 0px) - 16px) !important;
+    min-height: auto !important;
+    border-radius: 14px !important;
+  }
+  .k-wa-composer {
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* ========================================================================
+     APARTADO 5: DERIVACIONES A HUMANO
+     ======================================================================== */
+  .k-handoff-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .k-handoff-card {
+    border-radius: 14px !important;
+  }
+  .k-handoff-head {
+    min-height: 52px !important;
+    padding: 10px 14px !important;
+  }
+  .k-handoff-person {
+    padding: 12px 14px 8px !important;
+  }
+  .k-handoff-summary {
+    padding: 8px 14px 12px !important;
+    font-size: 13px !important;
+  }
+  .k-handoff-owner {
+    padding: 8px 14px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  .k-handoff-actions {
+    padding: 10px 14px !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+  }
+  .k-handoff-actions button {
+    min-height: 44px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+  }
+  .k-handoff-actions .main {
+    flex-basis: 100% !important;
+  }
+
+  /* ========================================================================
+     APARTADO 6: CONTACTOS / CLIENTES
+     ======================================================================== */
+  .table-tools {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 12px 14px !important;
+  }
+  .table-tools .search {
+    width: 100% !important;
+  }
+  .table-tools .record-count {
+    align-self: flex-start !important;
+  }
+  .data-table {
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* ========================================================================
+     APARTADO 7: CONFIGURACIÓN GENERAL
+     ======================================================================== */
+  .k-config-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .k-alias-list {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  .k-alias-edit-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  .k-zone-edit-row {
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+  }
+  .k-zone-cost-input {
+    width: 105px !important;
+    flex: 0 0 105px !important;
+  }
+  .k-pct-btn {
+    min-height: 42px !important;
+    height: 42px !important;
+    padding: 0 16px !important;
+    font-size: 14px !important;
+  }
+
+  /* ========================================================================
+     MODALES GENERALES
+     ======================================================================== */
+  .modal-backdrop {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+    box-sizing: border-box !important;
+  }
+  .modal, .k-modal {
+    width: 100% !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(88dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 16px !important;
+    padding: 18px 16px !important;
+    box-sizing: border-box !important;
+  }
+  .form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
   }
 }
 
-/* Móviles (hasta 480px) */
+/* Teléfonos móviles pequeños (<= 480px / iPhones) */
 @media (max-width: 480px) {
   .k-topbar {
-    height: 58px;
-    padding: 0 10px;
-    gap: 6px;
+    height: calc(58px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(58px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: 0 !important;
+    padding-left: max(10px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(10px, env(safe-area-inset-right, 0px)) !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
   }
   .k-topbar > div:first-of-type {
-    margin-left: 6px;
-    max-width: 115px;
+    margin-left: 4px;
+    max-width: 130px;
     min-width: 0;
     overflow: hidden;
   }
@@ -1304,11 +1686,13 @@
     display: none;
   }
   .k-topbar > div:first-of-type strong {
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 750;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     display: block;
+    color: var(--k-brown);
   }
   .k-top-actions {
     gap: 6px;
@@ -1332,34 +1716,22 @@
     padding: 0 9px;
     font-size: 10px;
   }
-  .k-audio-popover {
-    position: fixed;
-    top: calc(58px + env(safe-area-inset-top) + 6px);
-    right: 8px;
-    left: 8px;
-    width: auto;
-    max-width: calc(100vw - 16px);
-  }
-  .k-toast-container {
-    top: calc(58px + env(safe-area-inset-top) + 6px);
-    right: 8px;
-    left: 8px;
-    width: auto;
-    max-width: 100%;
-  }
   .k-heading h1 {
     font-size: 26px;
   }
-  .k-tabs {
-    gap: 4px;
-  }
   .k-tabs button {
-    height: 34px;
-    padding: 0 10px;
-    font-size: 10px;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 11px;
   }
   .k-order-items > div {
     font-size: 11px;
+  }
+  .k-order-actions {
+    flex-wrap: wrap;
+  }
+  .k-order-actions .main {
+    flex-basis: 100%;
   }
 }
 
