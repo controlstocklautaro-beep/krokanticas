@@ -454,6 +454,7 @@ export async function editKitchenOrder(businessId: string, body: Record<string, 
             return aliases.some((a) => normalizeText(a) === normKey);
           } catch { return false; }
         });
+      }
       if (!product) {
         // Coincidencia parcial
         product = allProducts.find((p) => normalizeText(p.name).includes(normKey) || normKey.includes(normalizeText(p.name)));

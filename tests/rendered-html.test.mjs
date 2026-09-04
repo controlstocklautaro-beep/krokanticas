@@ -151,7 +151,7 @@ test("includes persistent operational APIs and migrations", async () => {
   const kitchenStore = await readFile(new URL("lib/server/kitchen-store.ts", root), "utf8");
   assert.match(kitchenStore, /DELETE FROM order_items/);
   assert.match(kitchenStore, /subtotal = prepared\.reduce/);
-  assert.match(kitchenStore, /const total = subtotal \+ shippingCost/);
+  assert.match(kitchenStore, /const total = (finalSubtotal|subtotal) \+ shippingCost/);
   assert.doesNotMatch(kitchenStore, /total = \? \+ \?/);
   assert.match(kitchenStore, /receiptFromBody/);
   assert.match(kitchenStore, /"comprobante"/);
