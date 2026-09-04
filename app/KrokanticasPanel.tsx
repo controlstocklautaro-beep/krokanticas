@@ -37,6 +37,7 @@ import {
   canSendDesktopNotifications,
   isSoundEnabled,
   playChatMessageSound,
+  playHandoffAlertSound,
   playKitchenOrderSound,
   requestNotificationPermission,
   sendDesktopNotification,
@@ -203,18 +204,32 @@ function AudioControl() {
           </div>
 
           <div className="k-audio-test-section">
-            <span className="k-audio-test-label">PROBAR ALERTA</span>
-            <button
-              type="button"
-              className="k-audio-test-btn"
-              onClick={() => {
-                unlockAudio();
-                playKitchenOrderSound();
-              }}
-            >
-              <span>🍳 Campana de Cocina</span>
-              <small>Fuerte</small>
-            </button>
+            <span className="k-audio-test-label">PROBAR ALERTAS</span>
+            <div style={{ display: "grid", gap: "6px" }}>
+              <button
+                type="button"
+                className="k-audio-test-btn"
+                onClick={() => {
+                  unlockAudio();
+                  playKitchenOrderSound();
+                }}
+              >
+                <span>🍳 Campana de Cocina</span>
+                <small>Fuerte</small>
+              </button>
+              <button
+                type="button"
+                className="k-audio-test-btn siren"
+                style={{ borderColor: "#f5c2c7", background: "#fff5f5" }}
+                onClick={() => {
+                  unlockAudio();
+                  playHandoffAlertSound();
+                }}
+              >
+                <span style={{ color: "#bd2130", fontWeight: 700 }}>🚨 Sirena de Derivación</span>
+                <small style={{ color: "#bd2130", fontWeight: 800 }}>Urgente</small>
+              </button>
+            </div>
           </div>
 
           <div>
@@ -238,8 +253,13 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
   const [active, setActive] = useState<Section>("overview");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [openHandoffsCount, setOpenHandoffsCount] = useState(0);
+  const [inProgressHandoffsCount, setInProgressHandoffsCount] = useState(0);
+
   const seenOrderIds = useRef<Set<string>>(new Set());
   const initialOrdersLoaded = useRef(false);
+  const seenHandoffIds = useRef<Set<string>>(new Set());
+  const initialHandoffsLoaded = useRef(false);
 
   const name = user.displayName.includes("@") ? `Equipo ${business.name}` : user.displayName;
   const visibleSections = sections.filter((section) => {
@@ -258,57 +278,116 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
     setToasts((current) => current.filter((item) => item.id !== id));
   };
 
-  // Sincronización en tiempo real en segundo plano (Exclusiva para Comandas de Cocina)
+  // Sincronización en tiempo real en segundo plano (Cocina + Derivaciones / Atención Humana)
   useEffect(() => {
     let activeSync = true;
 
-    async function checkKitchenOrders() {
+    async function checkRealtimeUpdates() {
       try {
-        const data = await api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${encodeURIComponent(business.id)}`);
+        const [ordersRes, handoffsRes] = await Promise.all([
+          api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${encodeURIComponent(business.id)}`).catch(() => null),
+          api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${encodeURIComponent(business.id)}`).catch(() => null),
+        ]);
+
         if (!activeSync) return;
 
-        if (!initialOrdersLoaded.current) {
-          // Primera carga: registrar órdenes existentes sin alertar
-          for (const order of data.orders) {
-            seenOrderIds.current.add(order.id);
-          }
-          initialOrdersLoaded.current = true;
-        } else {
-          // Detección de órdenes nuevas
-          const newOrders = data.orders.filter(
-            (order) => !seenOrderIds.current.has(order.id) && ["confirmed", "in_kitchen"].includes(order.status)
-          );
-
-          if (newOrders.length > 0) {
-            for (const order of newOrders) {
+        // 1. Manejo de Comandas de Cocina
+        if (ordersRes && Array.isArray(ordersRes.orders)) {
+          if (!initialOrdersLoaded.current) {
+            for (const order of ordersRes.orders) {
               seenOrderIds.current.add(order.id);
-              playKitchenOrderSound();
+            }
+            initialOrdersLoaded.current = true;
+          } else {
+            const newOrders = ordersRes.orders.filter(
+              (order) => !seenOrderIds.current.has(order.id) && ["confirmed", "in_kitchen"].includes(order.status)
+            );
 
-              const orderNum = String(order.order_number).padStart(3, "0");
-              const itemsDesc =
-                order.items && order.items.length > 0
-                  ? order.items.map((it) => `${it.quantity}× ${it.product_name}`).join(", ")
-                  : "Nuevo pedido ingresado";
-              const deliveryTypeStr =
-                order.delivery_type === "delivery" ? "Envío a domicilio" : "Retiro por el local";
+            if (newOrders.length > 0) {
+              for (const order of newOrders) {
+                seenOrderIds.current.add(order.id);
+                playKitchenOrderSound();
 
-              addToast({
-                type: "kitchen",
-                badgeText: "Pedido a Cocina",
-                title: `Comanda #${orderNum} · ${order.customer_name}`,
-                subtitle: itemsDesc,
-                meta: `${deliveryTypeStr} · ${money(order.total)}`,
-                actionLabel: "Ver en Cocina",
-                onAction: () => choose("kitchen"),
-              });
+                const orderNum = String(order.order_number).padStart(3, "0");
+                const itemsDesc =
+                  order.items && order.items.length > 0
+                    ? order.items.map((it) => `${it.quantity}× ${it.product_name}`).join(", ")
+                    : "Nuevo pedido ingresado";
+                const deliveryTypeStr =
+                  order.delivery_type === "delivery" ? "Envío a domicilio" : "Retiro por el local";
 
-              sendDesktopNotification({
-                title: `Nueva Comanda #${orderNum}`,
-                body: `${order.customer_name} (${deliveryTypeStr}) - Total: ${money(order.total)}`,
-                onClick: () => {
-                  choose("kitchen");
-                },
-              });
+                addToast({
+                  type: "kitchen",
+                  badgeText: "Pedido a Cocina",
+                  title: `Comanda #${orderNum} · ${order.customer_name}`,
+                  subtitle: itemsDesc,
+                  meta: `${deliveryTypeStr} · ${money(order.total)}`,
+                  actionLabel: "Ver en Cocina",
+                  onAction: () => choose("kitchen"),
+                });
+
+                sendDesktopNotification({
+                  title: `Nueva Comanda #${orderNum}`,
+                  body: `${order.customer_name} (${deliveryTypeStr}) - Total: ${money(order.total)}`,
+                  onClick: () => {
+                    choose("kitchen");
+                  },
+                });
+              }
+            }
+          }
+        }
+
+        // 2. Manejo de Derivaciones / Atención Humana Requerida (Manual o API)
+        if (handoffsRes && Array.isArray(handoffsRes.handoffs)) {
+          const openHandoffs = handoffsRes.handoffs.filter((h) => h.status === "open");
+          const inProgress = handoffsRes.handoffs.filter((h) => h.status === "in_progress");
+          setOpenHandoffsCount(openHandoffs.length);
+          setInProgressHandoffsCount(inProgress.length);
+
+          if (!initialHandoffsLoaded.current) {
+            for (const handoff of handoffsRes.handoffs) {
+              seenHandoffIds.current.add(handoff.id);
+            }
+            initialHandoffsLoaded.current = true;
+          } else {
+            const newHandoffs = handoffsRes.handoffs.filter(
+              (handoff) => !seenHandoffIds.current.has(handoff.id) && handoff.status === "open"
+            );
+
+            if (newHandoffs.length > 0) {
+              for (const handoff of newHandoffs) {
+                seenHandoffIds.current.add(handoff.id);
+                // Sonido de sirena urgente
+                playHandoffAlertSound();
+
+                const reasonLabelMap: Record<string, string> = {
+                  complaint: "Reclamo",
+                  ambiguity: "Caso ambiguo",
+                  human_request: "Pidió atención humana",
+                  post_confirmation_change: "Cambio de pedido",
+                  other: "Derivación",
+                };
+                const reasonStr = reasonLabelMap[handoff.reason] || "Derivación";
+
+                addToast({
+                  type: "handoff",
+                  badgeText: "🚨 Derivación Requerida",
+                  title: `¡Atención! · ${handoff.customer_name}`,
+                  subtitle: `${reasonStr}: ${handoff.summary}`,
+                  meta: `Prioridad ${handoff.priority.toUpperCase()} · Sin tomar`,
+                  actionLabel: "Ver Derivación",
+                  onAction: () => choose("handoffs"),
+                });
+
+                sendDesktopNotification({
+                  title: `🚨 Alerta Derivación: ${handoff.customer_name}`,
+                  body: `${reasonStr}: ${handoff.summary}`,
+                  onClick: () => {
+                    choose("handoffs");
+                  },
+                });
+              }
             }
           }
         }
@@ -317,11 +396,11 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
       }
     }
 
-    void checkKitchenOrders();
+    void checkRealtimeUpdates();
 
-    // Sincronización continua de cocina cada 2.5 segundos
+    // Sincronización continua cada 2.5 segundos
     const timer = setInterval(() => {
-      void checkKitchenOrders();
+      void checkRealtimeUpdates();
     }, 2500);
 
     return () => {
@@ -361,8 +440,22 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
                             <Lock size={12} strokeWidth={2.2} aria-hidden />
                           </span>
                         )}
-                        {["kitchen", "handoffs"].includes(section.id) && (
-                          <b className="k-notification-dot" aria-label="Hay actividad" />
+                        {section.id === "kitchen" && (
+                          <b className="k-notification-dot" aria-label="Hay actividad en cocina" />
+                        )}
+                        {section.id === "handoffs" && (
+                          openHandoffsCount > 0 ? (
+                            <b
+                              className="k-notification-dot red-alert"
+                              aria-label={`${openHandoffsCount} derivaciones pendientes sin tomar`}
+                              title={`🚨 ${openHandoffsCount} derivación${openHandoffsCount > 1 ? "es" : ""} sin tomar`}
+                            />
+                          ) : inProgressHandoffsCount > 0 ? (
+                            <b
+                              className="k-notification-dot"
+                              aria-label="Derivaciones en atención"
+                            />
+                          ) : null
                         )}
                       </button>
                     );
@@ -965,7 +1058,9 @@ function HandoffsModule({ businessId }: { businessId: string }) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const contactId = String(form.get("contactId") || ""); const contact = contacts.find((item) => item.id === contactId);
     try {
       await api("/api/handoffs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, contactId: contactId || undefined, customerName: contact?.name || form.get("customerName"), phoneNumber: contact?.phone_number || form.get("phoneNumber"), reason: form.get("reason"), priority: form.get("priority"), summary: form.get("summary") }) });
-      setCreating(false); await reload();
+      setCreating(false);
+      playHandoffAlertSound();
+      await reload();
     } catch (createError) { setError(createError instanceof Error ? createError.message : "No se pudo crear"); }
   }
 
@@ -980,11 +1075,95 @@ function HandoffsModule({ businessId }: { businessId: string }) {
     catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar"); }
   }
 
+  const openCount = handoffs.filter((h) => h.status === "open").length;
+  const inProgressCount = handoffs.filter((h) => h.status === "in_progress").length;
+
   return <div className="k-module">
     <div className="k-heading"><div><span className="k-eyebrow">ATENCIÓN HUMANA</span><h1>Derivaciones y reclamos</h1><p>Tomá los casos que el agente no debe resolver solo y dejá registro hasta cerrarlos.</p></div><button className="k-primary" onClick={() => setCreating(true)}>＋ Nueva derivación</button></div>
     {error && <button className="k-error" onClick={() => setError("")}>{error} ×</button>}
-    <div className="k-tabs"><button className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>Pendientes</button><button className={filter === "open" ? "active" : ""} onClick={() => setFilter("open")}>Sin tomar</button><button className={filter === "in_progress" ? "active" : ""} onClick={() => setFilter("in_progress")}>En atención</button><button className={filter === "resolved" ? "active" : ""} onClick={() => setFilter("resolved")}>Resueltos</button><button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Todos</button></div>
-    <div className="k-handoff-grid">{visible.map((handoff) => <article className={`k-handoff-card ${handoff.priority} ${handoff.status}`} key={handoff.id}><div className="k-handoff-head"><div><b className="k-priority">PRIORIDAD {priorityLabel[handoff.priority].toUpperCase()}</b><span>{reasonLabel[handoff.reason]}</span></div><time>{new Date(handoff.created_at).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time></div><div className="k-handoff-person"><span>{handoff.customer_name.slice(0, 2).toUpperCase()}</span><div><h2>{handoff.customer_name}</h2><p>{handoff.phone_number || "Sin teléfono"}{handoff.order_id ? " · vinculada a comanda" : ""}</p></div></div><p className="k-handoff-summary">{handoff.summary}</p><div className="k-handoff-owner"><span>{handoff.status === "open" ? "Sin tomar" : handoff.status === "in_progress" ? `Atiende: ${handoff.assigned_to || "Equipo"}` : "Resuelto"}</span><select aria-label="Prioridad" value={handoff.priority} onChange={(event) => update(handoff, { priority: event.target.value as Handoff["priority"] })}><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option></select></div><div className="k-handoff-actions">{handoff.status === "open" && <button className="main" onClick={() => update(handoff, { status: "in_progress", assignedTo: "Equipo Krokanticas" })}>Tomar caso</button>}{handoff.status === "in_progress" && <button className="main" onClick={() => update(handoff, { status: "resolved" })}>Marcar resuelto</button>}{handoff.status === "resolved" && <button onClick={() => update(handoff, { status: "open", assignedTo: "" })}>Reabrir</button>}<button onClick={() => remove(handoff)}>Eliminar</button></div></article>)}{!visible.length && <div className="k-empty k-card">No hay derivaciones en esta vista.</div>}</div>
+    <div className="k-tabs">
+      <button className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>
+        Pendientes ({openCount + inProgressCount})
+      </button>
+      <button className={`${filter === "open" ? "active" : ""} ${openCount > 0 ? "has-open-alert" : ""}`} onClick={() => setFilter("open")}>
+        {openCount > 0 && <span className="k-tab-red-dot">● </span>}
+        Sin tomar ({openCount})
+      </button>
+      <button className={filter === "in_progress" ? "active" : ""} onClick={() => setFilter("in_progress")}>
+        En atención ({inProgressCount})
+      </button>
+      <button className={filter === "resolved" ? "active" : ""} onClick={() => setFilter("resolved")}>
+        Resueltos
+      </button>
+      <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>
+        Todos ({handoffs.length})
+      </button>
+    </div>
+    <div className="k-handoff-grid">
+      {visible.map((handoff) => {
+        const isOpen = handoff.status === "open";
+        return (
+          <article
+            className={`k-handoff-card ${handoff.priority} ${handoff.status} ${isOpen ? "is-open-alert open" : ""}`}
+            key={handoff.id}
+          >
+            {isOpen && (
+              <div className="k-handoff-alert-banner">
+                <AlertTriangle size={15} strokeWidth={2.4} aria-hidden />
+                <span>¡ALERTA SIN TOMAR! · REQUIERE ATENCIÓN HUMANA</span>
+              </div>
+            )}
+            <div className="k-handoff-head">
+              <div>
+                <b className={`k-priority ${isOpen ? "alert-high" : ""}`}>
+                  PRIORIDAD {priorityLabel[handoff.priority].toUpperCase()}
+                </b>
+                <span>{reasonLabel[handoff.reason]}</span>
+              </div>
+              <time>{new Date(handoff.created_at).toLocaleString("es-AR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</time>
+            </div>
+            <div className="k-handoff-person">
+              <span className={isOpen ? "avatar-alert" : ""}>{handoff.customer_name.slice(0, 2).toUpperCase()}</span>
+              <div>
+                <h2>{handoff.customer_name}</h2>
+                <p>{handoff.phone_number || "Sin teléfono"}{handoff.order_id ? " · vinculada a comanda" : ""}</p>
+              </div>
+            </div>
+            <p className="k-handoff-summary">{handoff.summary}</p>
+            <div className="k-handoff-owner">
+              <span>{handoff.status === "open" ? "🚨 Sin tomar" : handoff.status === "in_progress" ? `Atiende: ${handoff.assigned_to || "Equipo"}` : "Resuelto"}</span>
+              <select aria-label="Prioridad" value={handoff.priority} onChange={(event) => update(handoff, { priority: event.target.value as Handoff["priority"] })}>
+                <option value="low">Baja</option>
+                <option value="medium">Media</option>
+                <option value="high">Alta</option>
+              </select>
+            </div>
+            <div className="k-handoff-actions">
+              {handoff.status === "open" && (
+                <button
+                  className="main k-handoff-btn-take"
+                  onClick={() => update(handoff, { status: "in_progress", assignedTo: "Equipo Krokanticas" })}
+                >
+                  <AlertTriangle size={14} style={{ marginRight: 4 }} /> Tomar caso ahora
+                </button>
+              )}
+              {handoff.status === "in_progress" && (
+                <button className="main" onClick={() => update(handoff, { status: "resolved" })}>
+                  Marcar resuelto
+                </button>
+              )}
+              {handoff.status === "resolved" && (
+                <button onClick={() => update(handoff, { status: "open", assignedTo: "" })}>
+                  Reabrir
+                </button>
+              )}
+              <button onClick={() => remove(handoff)}>Eliminar</button>
+            </div>
+          </article>
+        );
+      })}
+      {!visible.length && <div className="k-empty k-card">No hay derivaciones en esta vista.</div>}
+    </div>
     {creating && <div className="modal-backdrop" onMouseDown={() => setCreating(false)}><form className="modal k-modal" onSubmit={create} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="k-eyebrow">ATENCIÓN HUMANA</span><h2>Nueva derivación</h2></div><button type="button" onClick={() => setCreating(false)}>×</button></div><label>Contacto existente<select name="contactId" defaultValue=""><option value="">Sin vincular</option>{contacts.map((contact) => <option value={contact.id} key={contact.id}>{contact.name} · {contact.phone_number}</option>)}</select></label><div className="form-grid"><label>Nombre si no está agendado<input name="customerName" /></label><label>Teléfono<input name="phoneNumber" /></label></div><div className="form-grid"><label>Motivo<select name="reason" defaultValue="human_request"><option value="complaint">Reclamo</option><option value="ambiguity">Caso ambiguo</option><option value="human_request">Pidió atención humana</option><option value="post_confirmation_change">Cambio luego de confirmar</option><option value="other">Otro</option></select></label><label>Prioridad<select name="priority" defaultValue="medium"><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option></select></label></div><label>Resumen<textarea name="summary" required placeholder="Qué pasó y qué necesita resolver el equipo" /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setCreating(false)}>Cancelar</button><button className="k-primary">Crear derivación</button></div></form></div>}
   </div>;
 }

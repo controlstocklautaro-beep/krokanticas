@@ -156,6 +156,67 @@ export function playChatMessageSound() {
 }
 
 /**
+ * Sonido de Alerta de Sirena para Derivaciones / Intervención Humana Requerida:
+ * Doble oscilación de sirena modulada potente y urgente (estilo sirena/alarma de emergencia)
+ */
+export function playHandoffAlertSound() {
+  if (!isSoundEnabled()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") void ctx.resume();
+
+  const baseVolume = getSoundVolume();
+  const now = ctx.currentTime;
+
+  // Realizamos 2 ciclos de sirena ascendente y descendente (urgente / atención)
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.type = "sawtooth"; // Tono brillante y penetrante tipo sirena de emergencia
+
+  // Modulación de frecuencia de sirena: 600Hz -> 1050Hz -> 650Hz -> 1050Hz -> 600Hz
+  osc.frequency.setValueAtTime(620, now);
+  osc.frequency.exponentialRampToValueAtTime(1050, now + 0.18);
+  osc.frequency.exponentialRampToValueAtTime(620, now + 0.36);
+  osc.frequency.exponentialRampToValueAtTime(1050, now + 0.54);
+  osc.frequency.exponentialRampToValueAtTime(620, now + 0.75);
+
+  const peakGain = 0.55 * baseVolume;
+  gain.gain.setValueAtTime(0.001, now);
+  gain.gain.linearRampToValueAtTime(peakGain, now + 0.05);
+  gain.gain.setValueAtTime(peakGain, now + 0.65);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + 0.86);
+
+  // Segundo oscilador armónico para mayor cuerpo
+  const subOsc = ctx.createOscillator();
+  const subGain = ctx.createGain();
+  subOsc.type = "sine";
+  subOsc.frequency.setValueAtTime(310, now);
+  subOsc.frequency.exponentialRampToValueAtTime(525, now + 0.18);
+  subOsc.frequency.exponentialRampToValueAtTime(310, now + 0.36);
+  subOsc.frequency.exponentialRampToValueAtTime(525, now + 0.54);
+  subOsc.frequency.exponentialRampToValueAtTime(310, now + 0.75);
+
+  const subPeakGain = 0.4 * baseVolume;
+  subGain.gain.setValueAtTime(0.001, now);
+  subGain.gain.linearRampToValueAtTime(subPeakGain, now + 0.05);
+  subGain.gain.setValueAtTime(subPeakGain, now + 0.65);
+  subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
+
+  subOsc.connect(subGain);
+  subGain.connect(ctx.destination);
+
+  subOsc.start(now);
+  subOsc.stop(now + 0.86);
+}
+
+/**
  * Gestión de Notificaciones del Sistema (Desktop Notifications API)
  */
 export async function requestNotificationPermission(): Promise<NotificationPermission> {

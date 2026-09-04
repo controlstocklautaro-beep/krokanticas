@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChefHat, MessageCircle, ArrowRight, X } from "lucide-react";
+import { ChefHat, MessageCircle, AlertTriangle, ArrowRight, X } from "lucide-react";
 
 export type ToastItem = {
   id: string;
-  type: "kitchen" | "whatsapp";
+  type: "kitchen" | "whatsapp" | "handoff";
   title: string;
   subtitle: string;
   meta?: string;
@@ -55,14 +55,17 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
   }, [onDismiss]);
 
   const isKitchen = toast.type === "kitchen";
+  const isHandoff = toast.type === "handoff";
 
   return (
     <div
-      className={`k-toast ${isKitchen ? "k-toast-kitchen" : "k-toast-whatsapp"}`}
+      className={`k-toast ${isHandoff ? "k-toast-handoff" : isKitchen ? "k-toast-kitchen" : "k-toast-whatsapp"}`}
       role="alert"
     >
       <div className="k-toast-icon">
-        {isKitchen ? (
+        {isHandoff ? (
+          <AlertTriangle size={22} color="#ffffff" aria-hidden />
+        ) : isKitchen ? (
           <ChefHat size={22} color="#ffffff" aria-hidden />
         ) : (
           <MessageCircle size={22} color="#ffffff" aria-hidden />
@@ -72,13 +75,15 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
       <div className="k-toast-content">
         <div className="k-toast-header">
           <div className="k-toast-badge-wrap">
-            <span className={`k-toast-badge ${isKitchen ? "kitchen" : "whatsapp"}`}>
-              {isKitchen ? (
+            <span className={`k-toast-badge ${isHandoff ? "handoff" : isKitchen ? "kitchen" : "whatsapp"}`}>
+              {isHandoff ? (
+                <AlertTriangle size={13} aria-hidden />
+              ) : isKitchen ? (
                 <ChefHat size={13} aria-hidden />
               ) : (
                 <MessageCircle size={13} aria-hidden />
               )}
-              <span>{toast.badgeText || (isKitchen ? "Pedido a Cocina" : "WhatsApp Business")}</span>
+              <span>{toast.badgeText || (isHandoff ? "🚨 Atención Humana" : isKitchen ? "Pedido a Cocina" : "WhatsApp Business")}</span>
             </span>
             <span className="k-toast-time">• Ahora</span>
           </div>

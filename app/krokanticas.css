@@ -1828,3 +1828,626 @@
   .k-whatsapp-cta-btn { justify-content:center; }
 }
 
+/* ==========================================================================
+   ALERTAS Y DERIVACIONES (SIRENA, PUNTITO ROJO Y CARDS DE ALERTA)
+   ========================================================================== */
+.k-notification-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: auto;
+  background: #ef8b48;
+  flex-shrink: 0;
+}
+
+.k-notification-dot.red-alert {
+  background: #e53e3e !important;
+  box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.8);
+  animation: k-pulse-red 1.3s infinite cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+@keyframes k-pulse-red {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.85);
+  }
+  70% {
+    transform: scale(1.25);
+    box-shadow: 0 0 0 9px rgba(229, 62, 62, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(229, 62, 62, 0);
+  }
+}
+
+.k-tab-red-dot {
+  color: #e53e3e;
+  font-size: 10px;
+  margin-right: 3px;
+  animation: k-pulse-red-text 1.3s infinite;
+}
+
+@keyframes k-pulse-red-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.has-open-alert {
+  border-color: #fca5a5 !important;
+  color: #c53030 !important;
+  font-weight: 750 !important;
+}
+
+/* Handoff Grid & Cards */
+.k-handoff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.k-handoff-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--k-line);
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(74, 50, 23, 0.05);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.k-handoff-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(74, 50, 23, 0.09);
+}
+
+/* Open Handoff Alert Style */
+.k-handoff-card.is-open-alert,
+.k-handoff-card.open {
+  border: 2px solid #e53e3e !important;
+  background: #fff7f7 !important;
+  box-shadow: 0 6px 24px rgba(229, 62, 62, 0.18) !important;
+}
+
+.k-handoff-alert-banner {
+  background: linear-gradient(135deg, #e53e3e, #c53030);
+  color: #ffffff;
+  padding: 7px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(197, 48, 48, 0.25);
+}
+
+.k-handoff-head {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--k-line);
+  background: #fdfaf6;
+}
+
+.is-open-alert .k-handoff-head {
+  background: #fff0f0;
+  border-bottom-color: #fed7d7;
+}
+
+.k-handoff-head > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.k-priority {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: #fdf1e8;
+  color: #b85416;
+}
+
+.k-priority.alert-high {
+  background: #fed7d7;
+  color: #9b2c2c;
+}
+
+.k-handoff-head span {
+  color: var(--k-muted);
+  font-size: 11px;
+}
+
+.k-handoff-head time {
+  color: var(--k-muted);
+  font-size: 11px;
+}
+
+.k-handoff-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px 8px;
+}
+
+.k-handoff-person > span {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  background: #fae7d8;
+  color: #784524;
+  flex-shrink: 0;
+}
+
+.k-handoff-person > span.avatar-alert {
+  background: #fed7d7 !important;
+  color: #c53030 !important;
+  box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.2);
+}
+
+.k-handoff-person h2 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--k-brown);
+}
+
+.k-handoff-person p {
+  margin: 0;
+  color: var(--k-muted);
+  font-size: 12px;
+}
+
+.k-handoff-summary {
+  margin: 0;
+  padding: 8px 16px 14px;
+  color: #4a3b32;
+  font-size: 13px;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.is-open-alert .k-handoff-summary {
+  color: #2d1e18;
+  font-weight: 600;
+}
+
+.k-handoff-owner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #fbf8f3;
+  border-top: 1px solid var(--k-line);
+  font-size: 12px;
+}
+
+.is-open-alert .k-handoff-owner {
+  background: #fff0f0;
+  border-top-color: #fed7d7;
+}
+
+.k-handoff-owner span {
+  color: var(--k-muted);
+  font-weight: 700;
+}
+
+.is-open-alert .k-handoff-owner span {
+  color: #c53030;
+}
+
+.k-handoff-owner select {
+  padding: 4px 8px;
+  border: 1px solid var(--k-line);
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  color: var(--k-brown);
+}
+
+.k-handoff-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--k-line);
+  background: #fff;
+}
+
+.is-open-alert .k-handoff-actions {
+  background: #fff7f7;
+  border-top-color: #fed7d7;
+}
+
+.k-handoff-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--k-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--k-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.k-handoff-actions .main {
+  flex: 1;
+  color: #fff;
+  border-color: var(--k-orange);
+  background: var(--k-orange);
+  font-weight: 750;
+}
+
+.k-handoff-actions .k-handoff-btn-take {
+  flex: 1;
+  color: #fff !important;
+  background: linear-gradient(135deg, #e53e3e, #c53030) !important;
+  border: 1px solid #b91c1c !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 14px rgba(229, 62, 62, 0.35) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.k-handoff-actions .k-handoff-btn-take:hover {
+  background: #b91c1c !important;
+  box-shadow: 0 6px 18px rgba(185, 28, 28, 0.45) !important;
+}
+
+/* ==========================================================================
+   TOAST NOTIFICATIONS (POP-UPS EN TIEMPO REAL)
+   ========================================================================== */
+.k-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.k-toast {
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 36px rgba(45, 33, 27, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e7ded5;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  animation: k-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes k-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.k-toast-kitchen .k-toast-icon {
+  background: linear-gradient(145deg, #d36a22, #b85416);
+}
+
+.k-toast-whatsapp .k-toast-icon {
+  background: linear-gradient(145deg, #25d366, #128c7e);
+}
+
+.k-toast-handoff .k-toast-icon {
+  background: linear-gradient(145deg, #e53e3e, #c53030);
+  animation: k-pulse-red 1.4s infinite;
+}
+
+.k-toast-handoff {
+  border-color: #fca5a5 !important;
+  box-shadow: 0 12px 38px rgba(229, 62, 62, 0.28), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+.k-toast-icon {
+  display: grid;
+  place-items: center;
+}
+
+.k-toast-content {
+  padding: 12px 14px 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.k-toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.k-toast-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.k-toast-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.k-toast-badge.kitchen {
+  background: #fbeee3;
+  color: #b85416;
+}
+
+.k-toast-badge.whatsapp {
+  background: #e6f7ec;
+  color: #128c7e;
+}
+
+.k-toast-badge.handoff {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.k-toast-time {
+  font-size: 10px;
+  color: #9c8e83;
+}
+
+.k-toast-close {
+  border: 0;
+  background: transparent;
+  color: #9c8e83;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+}
+
+.k-toast-close:hover {
+  color: #2d211b;
+  background: #f0e9e1;
+}
+
+.k-toast-title {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 750;
+  color: #2d211b;
+}
+
+.k-toast-subtitle {
+  margin: 0;
+  font-size: 12px;
+  color: #605147;
+  line-height: 1.35;
+}
+
+.k-toast-bubble {
+  margin: 3px 0 0;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #faf7f2;
+  border: 1px solid #efe5da;
+}
+
+.k-toast-meta {
+  font-size: 11px;
+  color: #8c7e73;
+  margin-top: 2px;
+}
+
+.k-toast-footer {
+  margin-top: 6px;
+}
+
+.k-toast-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--k-orange);
+  background: var(--k-orange);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.k-toast-handoff .k-toast-action-btn {
+  background: #e53e3e;
+  border-color: #c53030;
+}
+
+.k-toast-progress-track {
+  grid-column: span 2;
+  height: 3px;
+  background: #efe7de;
+}
+
+.k-toast-progress-bar {
+  height: 100%;
+  background: var(--k-orange);
+  transition: width 0.05s linear;
+}
+
+.k-toast-handoff .k-toast-progress-bar {
+  background: #e53e3e;
+}
+
+/* ==========================================================================
+   AUDIO & NOTIFICATION CONTROL BAR
+   ========================================================================== */
+.k-audio-wrap {
+  position: relative;
+}
+
+.k-audio-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--k-line);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--k-brown);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.k-audio-btn.muted {
+  color: #a39589;
+  background: #fbf7f2;
+}
+
+.k-audio-btn-short {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .k-audio-btn-label { display: none; }
+  .k-audio-btn-short { display: inline; }
+}
+
+.k-audio-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  width: 290px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--k-line);
+  box-shadow: 0 14px 38px rgba(45, 33, 27, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.k-audio-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.k-audio-popover-head strong {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--k-brown);
+}
+
+.k-audio-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--k-brown);
+}
+
+.k-wa-toggle-bot {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  border: 1px solid var(--k-line);
+  background: #f5f0ea;
+  color: #8c7e73;
+  cursor: pointer;
+}
+
+.k-wa-toggle-bot.active {
+  background: #e4f2eb;
+  color: var(--k-green);
+  border-color: #b5deca;
+}
+
+.k-audio-test-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #faf7f2;
+  border: 1px solid #f0e6dc;
+}
+
+.k-audio-test-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--k-muted);
+}
+
+.k-audio-test-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--k-line);
+  background: #fff;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.k-audio-test-btn small {
+  font-size: 9px;
+  color: var(--k-muted);
+  font-weight: 700;
+}
+
+.k-audio-notif-btn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--k-line);
+  background: #fff;
+  color: var(--k-brown);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.k-audio-notif-btn.active {
+  background: #e4f2eb;
+  color: var(--k-green);
+  border-color: #b5deca;
+}
+
