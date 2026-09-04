@@ -1409,17 +1409,32 @@ function KitchenModule({ businessId }: { businessId: string }) {
 
               <div className="k-order-actions">
                 {order.status === "confirmed" && (
-                  <button className="main btn-confirmed" disabled={updating} onClick={() => setStatus(order, "in_kitchen")}>
+                  <button
+                    className="main btn-confirmed"
+                    style={{ background: "#bd3f27", borderColor: "#a83520", color: "#ffffff" }}
+                    disabled={updating}
+                    onClick={() => setStatus(order, "in_kitchen")}
+                  >
                     {updating ? "Enviando…" : "Enviar a cocina"}
                   </button>
                 )}
                 {order.status === "in_kitchen" && (
-                  <button className="main btn-kitchen" disabled={updating} onClick={() => setStatus(order, "ready")}>
+                  <button
+                    className="main btn-kitchen"
+                    style={{ background: "#d97706", borderColor: "#b45309", color: "#ffffff" }}
+                    disabled={updating}
+                    onClick={() => setStatus(order, "ready")}
+                  >
                     {updating ? "Actualizando…" : "Marcar listo"}
                   </button>
                 )}
                 {order.status === "ready" && (
-                  <button className="main btn-ready" disabled={updating} onClick={() => setStatus(order, "delivered")}>
+                  <button
+                    className="main btn-ready"
+                    style={{ background: "#1b7a54", borderColor: "#146243", color: "#ffffff" }}
+                    disabled={updating}
+                    onClick={() => setStatus(order, "delivered")}
+                  >
                     {updating ? "Actualizando…" : "Comanda entregada"}
                   </button>
                 )}

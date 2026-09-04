@@ -339,22 +339,22 @@
   background: #a83520 !important;
 }
 
-/* 2. En preparación / En cocina (MARRÓN / DORADO) */
+/* 2. En preparación / En cocina (DORADO / ÁMBAR) */
 .k-order-card.in_kitchen { border-color:#dfc79e; }
-.k-order-card.in_kitchen .k-order-head span { color:#8c5c20; }
+.k-order-card.in_kitchen .k-order-head span { color:#d97706; }
 .k-order-card.in_kitchen .k-order-head b { color:#8c5c20; background:#f7e4bf; }
 .k-order-actions .main.btn-kitchen,
 .k-order-actions .main.btn-in-kitchen,
 .k-order-card.in_kitchen .k-order-actions .main {
-  background: #b85416 !important;
-  border-color: #9f450e !important;
+  background: #d97706 !important;
+  border-color: #b45309 !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(184, 84, 22, 0.28);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.28);
 }
 .k-order-actions .main.btn-kitchen:hover,
 .k-order-actions .main.btn-in-kitchen:hover,
 .k-order-card.in_kitchen .k-order-actions .main:hover {
-  background: #9f450e !important;
+  background: #b45309 !important;
 }
 
 /* 3. Listo / Listo para entrega (VERDE) */
