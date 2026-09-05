@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { CustomersModule, MessagesModule } from "./components/OperationalModules";
 import { NotificationToasts, type ToastItem } from "./components/NotificationToasts";
+import { PaginationControls } from "./components/PaginationControls";
 import { PwaInstall } from "./components/PwaInstall";
 import { UsersModule } from "./components/UsersModule";
 import {
@@ -1207,6 +1208,8 @@ function KitchenModule({ businessId }: { businessId: string }) {
   const [editItems, setEditItems] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [kitchenPage, setKitchenPage] = useState(1);
+  const [kitchenPageSize, setKitchenPageSize] = useState(10);
 
   async function reload() {
     try {
@@ -1306,6 +1309,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
   }, [monthOrders]);
 
   function changeMonthBy(delta: number) {
+    setKitchenPage(1);
     if (selectedMonth === "all") {
       setSelectedMonth(getCurrentMonthKey());
       return;
@@ -1327,6 +1331,16 @@ function KitchenModule({ businessId }: { businessId: string }) {
           String(order.order_number).includes(term))
     );
   }, [monthOrders, filter, search]);
+
+  const isPaginated = filter === "delivered" || filter === "all";
+  const totalPages = Math.max(1, Math.ceil(visible.length / kitchenPageSize));
+  const safePage = Math.min(Math.max(1, kitchenPage), totalPages);
+
+  const displayOrders = useMemo(() => {
+    if (!isPaginated) return visible;
+    const start = (safePage - 1) * kitchenPageSize;
+    return visible.slice(start, start + kitchenPageSize);
+  }, [visible, isPaginated, safePage, kitchenPageSize]);
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1469,7 +1483,10 @@ function KitchenModule({ businessId }: { businessId: string }) {
           </button>
           <select
             value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
+            onChange={(e) => {
+              setSelectedMonth(e.target.value);
+              setKitchenPage(1);
+            }}
             aria-label="Filtrar por mes"
           >
             {availableMonths.map((m) => (
@@ -1516,7 +1533,10 @@ function KitchenModule({ businessId }: { businessId: string }) {
             <button
               type="button"
               className="k-today-btn"
-              onClick={() => setSelectedMonth(getCurrentMonthKey())}
+              onClick={() => {
+                setSelectedMonth(getCurrentMonthKey());
+                setKitchenPage(1);
+              }}
             >
               Volver al mes actual
             </button>
@@ -1526,19 +1546,26 @@ function KitchenModule({ businessId }: { businessId: string }) {
 
       <div className="k-kitchen-tools">
         <div className="k-tabs">
-          <button className={filter === "active" ? "active" : ""} onClick={() => setFilter("active")}>Pendientes</button>
-          <button className={filter === "ready" ? "active" : ""} onClick={() => setFilter("ready")}>Listos</button>
-          <button className={filter === "delivered" ? "active" : ""} onClick={() => setFilter("delivered")}>Entregados</button>
-          <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}>Todos</button>
+          <button className={filter === "active" ? "active" : ""} onClick={() => { setFilter("active"); setKitchenPage(1); }}>Pendientes</button>
+          <button className={filter === "ready" ? "active" : ""} onClick={() => { setFilter("ready"); setKitchenPage(1); }}>Listos</button>
+          <button className={filter === "delivered" ? "active" : ""} onClick={() => { setFilter("delivered"); setKitchenPage(1); }}>Entregados</button>
+          <button className={filter === "all" ? "active" : ""} onClick={() => { setFilter("all"); setKitchenPage(1); }}>Todos</button>
         </div>
         <label className="k-search">
           <Search size={17} aria-hidden />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente, teléfono o número" />
+          <input
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setKitchenPage(1);
+            }}
+            placeholder="Buscar cliente, teléfono o número"
+          />
         </label>
       </div>
 
       <div className="k-order-grid">
-        {visible.map((order) => {
+        {displayOrders.map((order) => {
           const updating = updatingOrderId === order.id;
           const isRecent = order.created_at && (now - order.created_at) < 30_000 && ["confirmed", "in_kitchen"].includes(order.status);
 
@@ -1625,6 +1652,24 @@ function KitchenModule({ businessId }: { businessId: string }) {
         })}
         {!visible.length && <div className="k-empty k-card">No hay comandas en esta vista.</div>}
       </div>
+
+      {isPaginated && visible.length > 0 && (
+        <PaginationControls
+          currentPage={safePage}
+          totalPages={totalPages}
+          totalItems={visible.length}
+          pageSize={kitchenPageSize}
+          onPageChange={(p) => setKitchenPage(p)}
+          onPageSizeChange={(sz) => {
+            setKitchenPageSize(sz);
+            setKitchenPage(1);
+          }}
+          pageSizeOptions={[10, 20, 50]}
+          itemLabel="comandas"
+          className="k-pagination-standalone"
+        />
+      )}
+
 
       {creating && (
         <div className="modal-backdrop" onMouseDown={() => setCreating(false)}>

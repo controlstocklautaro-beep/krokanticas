@@ -16,6 +16,7 @@ import {
   UserRound,
   Zap,
 } from "lucide-react";
+import { PaginationControls } from "./PaginationControls";
 
 type ChatRecord = {
   phone_number: string;
@@ -792,33 +793,194 @@ export function CustomersModule({ businessId }: { businessId: string }) {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<ContactRecord | null | "new">(null);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
 
   async function reload() {
     const data = await api<{ contacts: ContactRecord[] }>(`/api/contacts?businessId=${encodeURIComponent(businessId)}`);
     setContacts(data.contacts);
   }
 
-  useEffect(() => { void api<{ contacts: ContactRecord[] }>(`/api/contacts?businessId=${encodeURIComponent(businessId)}`).then((data) => setContacts(data.contacts)).catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar")); }, [businessId]);
+  useEffect(() => {
+    void api<{ contacts: ContactRecord[] }>(`/api/contacts?businessId=${encodeURIComponent(businessId)}`)
+      .then((data) => setContacts(data.contacts))
+      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+  }, [businessId]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const payload = { businessId, id: typeof editing === "object" && editing ? editing.id : undefined, name: form.get("name"), phone_number: form.get("phone"), email: form.get("email"), address: form.get("address"), notes: form.get("notes") };
+    const payload = {
+      businessId,
+      id: typeof editing === "object" && editing ? editing.id : undefined,
+      name: form.get("name"),
+      phone_number: form.get("phone"),
+      email: form.get("email"),
+      address: form.get("address"),
+      notes: form.get("notes"),
+    };
     try {
-      await api("/api/contacts", { method: editing === "new" ? "POST" : "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      setEditing(null); await reload();
-    } catch (saveError) { setError(saveError instanceof Error ? saveError.message : "No se pudo guardar"); }
+      await api("/api/contacts", {
+        method: editing === "new" ? "POST" : "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setEditing(null);
+      await reload();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar");
+    }
   }
 
   async function remove(contact: ContactRecord) {
     if (!window.confirm(`¿Eliminar a ${contact.name}?`)) return;
-    await api("/api/contacts", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ businessId, id: contact.id }) });
+    await api("/api/contacts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ businessId, id: contact.id }),
+    });
     setContacts((current) => current.filter((item) => item.id !== contact.id));
   }
 
-  const filtered = contacts.filter((contact) => `${contact.name} ${contact.phone_number} ${contact.email || ""} ${contact.address || ""}`.toLowerCase().includes(search.toLowerCase()));
-  return <div className="real-module"><div className="module-heading"><div><span className="eyebrow">BASE DE CLIENTES</span><h1>Contactos</h1><p>Datos, dirección de entrega y control del asistente por cliente.</p></div><button className="primary" onClick={() => setEditing("new")}>＋ Nuevo contacto</button></div>{error && <button className="module-error" onClick={() => setError("")}>{error} ×</button>}<div className="panel table-panel"><div className="table-tools"><label className="search"><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por nombre, teléfono o dirección" /></label><span className="record-count">{filtered.length} contactos</span></div><div className="data-table"><div className="data-row contacts-grid data-head"><span>CONTACTO</span><span>TELÉFONO</span><span>DIRECCIÓN</span><span>BOT</span><span>ACCIONES</span></div>{filtered.map((contact) => <div className="data-row contacts-grid" key={contact.id}><span className="customer-cell"><i className="guest-avatar">{initials(contact.name)}</i><strong>{contact.name}</strong></span><span>{contact.phone_number}</span><span>{contact.address || "—"}</span><span><b className={contact.agent_active ? "state-pill on" : "state-pill off"}>{contact.agent_active ? "Bot ON" : "Bot OFF"}</b></span><span className="row-actions"><button onClick={() => setEditing(contact)}>Editar</button><button onClick={() => remove(contact)}>Eliminar</button></span></div>)}{!filtered.length && <div className="empty-table">No se encontraron contactos.</div>}</div></div>{editing && <div className="modal-backdrop" onMouseDown={() => setEditing(null)}><form className="modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}><div className="modal-head"><div><span className="eyebrow">CONTACTOS</span><h2>{editing === "new" ? "Nuevo contacto" : "Editar contacto"}</h2></div><button type="button" onClick={() => setEditing(null)}>×</button></div><label>Nombre<input name="name" defaultValue={editing === "new" ? "" : editing.name} required autoFocus /></label><label>Teléfono<input name="phone" defaultValue={editing === "new" ? "" : editing.phone_number} required /></label><label>Email<input name="email" type="email" defaultValue={editing === "new" ? "" : editing.email || ""} /></label><label>Dirección de entrega<input name="address" defaultValue={editing === "new" ? "" : editing.address || ""} placeholder="Calle, número y referencia" /></label><label>Notas<textarea name="notes" defaultValue={editing === "new" ? "" : editing.notes || ""} /></label><div className="modal-actions"><button type="button" className="secondary" onClick={() => setEditing(null)}>Cancelar</button><button type="submit" className="primary">Guardar contacto</button></div></form></div>}</div>;
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return contacts.filter((contact) =>
+      `${contact.name} ${contact.phone_number} ${contact.email || ""} ${contact.address || ""}`
+        .toLowerCase()
+        .includes(term)
+    );
+  }, [contacts, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
+  return (
+    <div className="real-module">
+      <div className="module-heading">
+        <div>
+          <span className="eyebrow">BASE DE CLIENTES</span>
+          <h1>Contactos</h1>
+          <p>Datos, dirección de entrega y control del asistente por cliente.</p>
+        </div>
+        <button className="primary" onClick={() => setEditing("new")}>
+          ＋ Nuevo contacto
+        </button>
+      </div>
+      {error && <button className="module-error" onClick={() => setError("")}>{error} ×</button>}
+      <div className="panel table-panel">
+        <div className="table-tools">
+          <label className="search">
+            <span>⌕</span>
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Buscar por nombre, teléfono o dirección"
+            />
+          </label>
+          <span className="record-count">{filtered.length} contactos</span>
+        </div>
+        <div className="data-table">
+          <div className="data-row contacts-grid data-head">
+            <span>CONTACTO</span>
+            <span>TELÉFONO</span>
+            <span>DIRECCIÓN</span>
+            <span>BOT</span>
+            <span>ACCIONES</span>
+          </div>
+          {paginated.map((contact) => (
+            <div className="data-row contacts-grid" key={contact.id}>
+              <span className="customer-cell">
+                <i className="guest-avatar">{initials(contact.name)}</i>
+                <strong>{contact.name}</strong>
+              </span>
+              <span>{contact.phone_number}</span>
+              <span>{contact.address || "—"}</span>
+              <span>
+                <b className={contact.agent_active ? "state-pill on" : "state-pill off"}>
+                  {contact.agent_active ? "Bot ON" : "Bot OFF"}
+                </b>
+              </span>
+              <span className="row-actions">
+                <button onClick={() => setEditing(contact)}>Editar</button>
+                <button onClick={() => remove(contact)}>Eliminar</button>
+              </span>
+            </div>
+          ))}
+          {!filtered.length && <div className="empty-table">No se encontraron contactos.</div>}
+        </div>
+        <PaginationControls
+          currentPage={safePage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={(p) => setCurrentPage(p)}
+          onPageSizeChange={(sz) => {
+            setPageSize(sz);
+            setCurrentPage(1);
+          }}
+          pageSizeOptions={[15, 30, 50]}
+          itemLabel="contactos"
+        />
+      </div>
+      {editing && (
+        <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
+          <form className="modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="eyebrow">CONTACTOS</span>
+                <h2>{editing === "new" ? "Nuevo contacto" : "Editar contacto"}</h2>
+              </div>
+              <button type="button" onClick={() => setEditing(null)}>
+                ×
+              </button>
+            </div>
+            <label>
+              Nombre
+              <input name="name" defaultValue={editing === "new" ? "" : editing.name} required autoFocus />
+            </label>
+            <label>
+              Teléfono
+              <input name="phone" defaultValue={editing === "new" ? "" : editing.phone_number} required />
+            </label>
+            <label>
+              Email
+              <input name="email" type="email" defaultValue={editing === "new" ? "" : editing.email || ""} />
+            </label>
+            <label>
+              Dirección de entrega
+              <input
+                name="address"
+                defaultValue={editing === "new" ? "" : editing.address || ""}
+                placeholder="Calle, número y referencia"
+              />
+            </label>
+            <label>
+              Notas
+              <textarea name="notes" defaultValue={editing === "new" ? "" : editing.notes || ""} />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="secondary" onClick={() => setEditing(null)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary">
+                Guardar contacto
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
+
 
 export function TagsModule({ businessId }: { businessId: string }) {
   const [tags, setTags] = useState<TagRecord[]>([]);
