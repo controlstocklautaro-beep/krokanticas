@@ -58,7 +58,111 @@ type OrderInput = {
   items?: OrderItemInput[];
 };
 
+function normalizeText(text: string): string {
+  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function getStatusRank(status: unknown): number {
+  const s = String(status || "").toLowerCase();
+  if (s === "delivered") return 4;
+  if (s === "ready") return 3;
+  if (s === "in_kitchen") return 2;
+  if (s === "confirmed") return 1;
+  return 0;
+}
+
+function areItemsEqual(
+  itemsA: { product_id?: unknown; productId?: unknown; product_name?: unknown; name?: unknown; quantity?: unknown }[],
+  itemsB: { product_id?: unknown; productId?: unknown; product_name?: unknown; name?: unknown; quantity?: unknown }[]
+): boolean {
+  if (!Array.isArray(itemsA) || !Array.isArray(itemsB)) return false;
+  if (itemsA.length !== itemsB.length) return false;
+
+  const getMap = (items: typeof itemsA) => {
+    const map = new Map<string, number>();
+    for (const it of items) {
+      const key = String(it.product_id || it.productId || normalizeText(String(it.product_name || it.name || ""))).trim();
+      if (!key) return null;
+      map.set(key, (map.get(key) || 0) + Number(it.quantity || 0));
+    }
+    return map;
+  };
+
+  const mapA = getMap(itemsA);
+  const mapB = getMap(itemsB);
+  if (!mapA || !mapB || mapA.size !== mapB.size) return false;
+
+  for (const [key, qtyA] of mapA.entries()) {
+    if (mapB.get(key) !== qtyA) return false;
+  }
+  return true;
+}
+
+export async function consolidateDuplicateOrders(businessId: string) {
+  const db = getD1();
+  const now = Date.now();
+  const activeOrdersRes = await db.prepare(`
+    SELECT id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at
+    FROM orders
+    WHERE business_id = ? AND status NOT IN ('cancelled', 'delivered')
+    ORDER BY created_at ASC
+  `).bind(businessId).all<Record<string, unknown>>();
+
+  const orders = activeOrdersRes.results;
+  if (orders.length < 2) return;
+
+  const allItemsRes = await db.prepare("SELECT id, order_id, product_id, product_name, quantity FROM order_items WHERE business_id = ?").bind(businessId).all<{ id: string; order_id: string; product_id: string; product_name: string; quantity: number }>();
+  const itemsByOrder = new Map<string, typeof allItemsRes.results>();
+  for (const item of allItemsRes.results) {
+    const list = itemsByOrder.get(item.order_id) || [];
+    list.push(item);
+    itemsByOrder.set(item.order_id, list);
+  }
+
+  const processedIds = new Set<string>();
+
+  for (let i = 0; i < orders.length; i++) {
+    const primary = orders[i];
+    if (processedIds.has(primary.id as string)) continue;
+    const primaryItems = itemsByOrder.get(primary.id as string) || [];
+
+    for (let j = i + 1; j < orders.length; j++) {
+      const duplicate = orders[j];
+      if (processedIds.has(duplicate.id as string)) continue;
+
+      const sameClient = (primary.contact_id && primary.contact_id === duplicate.contact_id) || (primary.phone_number && primary.phone_number === duplicate.phone_number);
+      const timeDiff = Math.abs(Number(primary.created_at) - Number(duplicate.created_at));
+      if (sameClient && timeDiff <= 12 * 60 * 60 * 1000) {
+        const duplicateItems = itemsByOrder.get(duplicate.id as string) || [];
+        if (areItemsEqual(primaryItems, duplicateItems)) {
+          const primaryRank = getStatusRank(primary.status);
+          const duplicateRank = getStatusRank(duplicate.status);
+          const resolvedStatus = primaryRank >= duplicateRank ? primary.status : duplicate.status;
+          const resolvedReceipt = (primary.receipt_url as string | null) || (duplicate.receipt_url as string | null) || null;
+          const resolvedPayment = resolvedReceipt || primary.payment_method === "transfer" || duplicate.payment_method === "transfer" ? "transfer" : primary.payment_method;
+
+          await db.prepare("UPDATE orders SET status = ?, receipt_url = ?, payment_method = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+            .bind(resolvedStatus, resolvedReceipt, resolvedPayment, now, primary.id, businessId).run();
+
+          for (const item of duplicateItems) {
+            if (item.product_id) {
+              await db.prepare("UPDATE products SET stock_quantity = COALESCE(stock_quantity, 0) + ?, stock_status = 'limited', updated_at = ? WHERE id = ? AND business_id = ? AND stock_status IN ('limited', 'soldout')")
+                .bind(item.quantity, now, item.product_id, businessId).run();
+            }
+          }
+
+          await db.prepare("DELETE FROM order_items WHERE order_id = ? AND business_id = ?").bind(duplicate.id, businessId).run();
+          await db.prepare("DELETE FROM orders WHERE id = ? AND business_id = ?").bind(duplicate.id, businessId).run();
+
+          processedIds.add(duplicate.id as string);
+        }
+      }
+    }
+  }
+}
+
 export async function listKitchenOrders(businessId: string, status?: string | null) {
+  await consolidateDuplicateOrders(businessId).catch(() => undefined);
   const db = getD1();
   const filter = status && status !== "all" ? " AND status = ?" : "";
   const query = `SELECT id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at FROM orders WHERE business_id = ?${filter} ORDER BY created_at DESC`;
@@ -66,10 +170,6 @@ export async function listKitchenOrders(businessId: string, status?: string | nu
   if (!orders.results.length) return [];
   const items = await db.prepare("SELECT id, order_id, product_id, product_name, quantity, unit_price, subtotal FROM order_items WHERE business_id = ? ORDER BY product_name").bind(businessId).all<Record<string, unknown>>();
   return orders.results.map((order) => ({ ...order, items: items.results.filter((item) => item.order_id === order.id) }));
-}
-
-function normalizeText(text: string): string {
-  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
 const RECEIPT_KEYS = [
@@ -352,6 +452,102 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   const zone = (body.zone || body.zona || "").trim() || null;
   const notes = (body.notes || "").trim() || null;
   const receiptUrl = receiptFromBody(rawBody as Record<string, unknown>).url;
+
+  // Detección y solapamiento de pedidos idénticos duplicados (ej: confirmación + envío de comprobante posterior)
+  const candidateOrders = await db.prepare(`
+    SELECT id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at
+    FROM orders
+    WHERE business_id = ?
+      AND (contact_id = ? OR phone_number = ?)
+      AND status NOT IN ('cancelled', 'delivered')
+      AND created_at >= ?
+    ORDER BY created_at DESC
+  `).bind(businessId, contactId, phoneNumber, now - (12 * 60 * 60 * 1000)).all<Record<string, unknown>>();
+
+  if (candidateOrders.results.length > 0) {
+    for (const candidate of candidateOrders.results) {
+      const candidateItemsRes = await db.prepare("SELECT product_id, product_name, quantity, unit_price, subtotal FROM order_items WHERE order_id = ? AND business_id = ?")
+        .bind(candidate.id, businessId).all<{ product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }>();
+
+      if (areItemsEqual(candidateItemsRes.results, preparedItems)) {
+        // Coincidencia exacta de pedido -> Solapar / fusionar manteniendo el paso más avanzado y el comprobante
+        const existingStatus = String(candidate.status || "confirmed");
+        const incomingStatus = "confirmed";
+        const resolvedStatus = getStatusRank(existingStatus) >= getStatusRank(incomingStatus) ? existingStatus : incomingStatus;
+
+        const resolvedReceipt = receiptUrl || (candidate.receipt_url as string | null) || null;
+        let resolvedPayment = candidate.payment_method as string;
+        if (resolvedReceipt || paymentMethod === "transfer" || candidate.payment_method === "transfer") {
+          resolvedPayment = "transfer";
+        } else if (paymentMethod && paymentMethod !== "pending") {
+          resolvedPayment = paymentMethod;
+        }
+
+        const resolvedAddress = address || (candidate.address as string | null) || null;
+        const resolvedZone = zone || (candidate.zone as string | null) || null;
+        const resolvedDeliveryType = deliveryType || (candidate.delivery_type as "pickup" | "delivery") || "pickup";
+        const resolvedScheduledTime = scheduledTime !== "Ahora" ? scheduledTime : ((candidate.scheduled_time as string) || "Ahora");
+        const resolvedNotes = notes ? (candidate.notes ? `${candidate.notes} · ${notes}` : notes) : (candidate.notes as string | null);
+
+        await db.prepare(`
+          UPDATE orders
+          SET status = ?,
+              receipt_url = ?,
+              payment_method = ?,
+              delivery_type = ?,
+              address = ?,
+              zone = ?,
+              scheduled_time = ?,
+              notes = ?,
+              updated_at = ?
+          WHERE id = ? AND business_id = ?
+        `).bind(
+          resolvedStatus,
+          resolvedReceipt,
+          resolvedPayment,
+          resolvedDeliveryType,
+          resolvedAddress,
+          resolvedZone,
+          resolvedScheduledTime,
+          resolvedNotes,
+          now,
+          candidate.id,
+          businessId
+        ).run();
+
+        return {
+          id: candidate.id as string,
+          orderNumber: Number(candidate.order_number),
+          order_number: Number(candidate.order_number),
+          customerName: candidate.customer_name as string,
+          phoneNumber: candidate.phone_number as string,
+          deliveryType: resolvedDeliveryType,
+          delivery_type: resolvedDeliveryType,
+          address: resolvedAddress,
+          zone: resolvedZone,
+          paymentMethod: resolvedPayment,
+          payment_method: resolvedPayment,
+          scheduledTime: resolvedScheduledTime,
+          scheduled_time: resolvedScheduledTime,
+          time: resolvedScheduledTime,
+          horario: resolvedScheduledTime,
+          subtotal: Number(candidate.subtotal),
+          discountAmount,
+          discount_amount: discountAmount,
+          discountPercentage,
+          discount_percentage: discountPercentage,
+          shippingCost: Number(candidate.shipping_cost),
+          total: Number(candidate.total),
+          status: resolvedStatus,
+          receiptUrl: resolvedReceipt,
+          receipt_url: resolvedReceipt,
+          notes: resolvedNotes,
+          items: candidateItemsRes.results.map((i) => ({ productId: i.product_id, name: i.product_name, quantity: i.quantity, unitPrice: i.unit_price, subtotal: i.subtotal })),
+          merged: true,
+        };
+      }
+    }
+  }
 
   const numberRow = await db.prepare("SELECT COALESCE(MAX(order_number), 0) + 1 AS next_number FROM orders WHERE business_id = ?").bind(businessId).first<{ next_number: number }>();
   const orderNumber = Number(numberRow?.next_number ?? 1);

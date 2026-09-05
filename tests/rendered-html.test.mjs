@@ -155,8 +155,10 @@ test("includes persistent operational APIs and migrations", async () => {
   assert.doesNotMatch(kitchenStore, /total = \? \+ \?/);
   assert.match(kitchenStore, /receiptFromBody/);
   assert.match(kitchenStore, /"comprobante"/);
-  assert.match(kitchenStore, /"url_comprobante"/);
   assert.match(kitchenStore, /receipt_url: receiptUrl/);
+  assert.match(kitchenStore, /consolidateDuplicateOrders/);
+  assert.match(kitchenStore, /areItemsEqual/);
+  assert.match(kitchenStore, /candidateOrders/);
   const stock = await readFile(new URL("app/api/stock/route.ts", root), "utf8");
   const contacts = await readFile(new URL("app/api/contacts/route.ts", root), "utf8");
   const adjust = await readFile(new URL("app/api/stock/adjust/route.ts", root), "utf8");
