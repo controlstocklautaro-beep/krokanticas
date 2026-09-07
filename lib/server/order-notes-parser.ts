@@ -88,10 +88,20 @@ export async function parseOrderItemsFromNotes(notes: string, products: CatalogP
     throw new ApiError("No se pudo interpretar el pedido automáticamente", 502);
   }
 
-  const body = await response.json() as { output_text?: string };
+  const body = await response.json() as {
+    output_text?: string;
+    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  };
+  // `output_text` is a convenience property exposed by OpenAI SDKs. The raw
+  // REST response instead contains the text in output[].content[].text.
+  const outputText = body.output_text || body.output
+    ?.flatMap((item) => item.content || [])
+    .filter((content) => content.type === "output_text")
+    .map((content) => content.text || "")
+    .join("");
   let parsed: { confirmed?: unknown; items?: unknown };
   try {
-    parsed = JSON.parse(body.output_text || "");
+    parsed = JSON.parse(outputText || "");
   } catch {
     throw new ApiError("La interpretación automática del pedido no devolvió un formato válido", 502);
   }
