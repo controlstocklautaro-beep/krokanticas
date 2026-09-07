@@ -1,5 +1,6 @@
 import { getD1 } from "@/db";
 import { ApiError } from "./api-utils";
+import { parseOrderItemsFromNotes } from "./order-notes-parser";
 
 type OrderItemInput = {
   productId?: string;
@@ -56,6 +57,8 @@ type OrderInput = {
   proofUrl?: string;
   proof_url?: string;
   items?: OrderItemInput[];
+  parseItemsFromNotes?: boolean;
+  parse_items_from_notes?: boolean;
 };
 
 function normalizeText(text: string): string {
@@ -261,10 +264,6 @@ function parsePaymentMethod(val: unknown): "transfer" | "cash" | "pending" {
 
 export async function createKitchenOrder(businessId: string, rawBody: OrderInput | Record<string, unknown>) {
   const body = rawBody as OrderInput;
-  if (!Array.isArray(body.items) || body.items.length === 0) {
-    throw new ApiError("La comanda necesita al menos un producto (items)", 400);
-  }
-
   const db = getD1();
   const now = Date.now();
 
@@ -336,6 +335,14 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   const allProductsRes = await db.prepare("SELECT id, name, price, aliases, stock_status, stock_quantity FROM products WHERE business_id = ? AND active = 1")
     .bind(businessId).all<{ id: string; name: string; price: number; aliases: string; stock_status: string; stock_quantity: number | null }>();
   const allProducts = allProductsRes.results;
+
+  const parseItemsFromNotes = body.parseItemsFromNotes === true || body.parse_items_from_notes === true;
+  if ((!Array.isArray(body.items) || body.items.length === 0) && parseItemsFromNotes) {
+    body.items = await parseOrderItemsFromNotes(String(body.notes || ""), allProducts);
+  }
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    throw new ApiError("La comanda necesita al menos un producto (items)", 400);
+  }
 
   // 3. Resolver cada item
   const preparedItems: { id: string; productId: string; name: string; quantity: number; price: number; subtotal: number; stockStatus: string; stockQuantity: number | null }[] = [];

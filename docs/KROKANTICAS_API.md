@@ -77,6 +77,25 @@ También se admite `delta: -2` o `delta: 3`. Nunca se permite que la cantidad qu
 
 Cada comanda exige un `contactId` válido de la misma empresa. Al crearla, el servidor toma nombre, teléfono y dirección desde el contacto, valida el catálogo, calcula subtotal y total, y descuenta el stock limitado. Si se envía `items` al editar, el servidor reemplaza los productos, devuelve el stock anterior, descuenta el nuevo y recalcula los importes.
 
+### Recuperación de ítems desde historial de n8n
+
+Solo cuando n8n no pudo resolver las variedades, puede enviar una comanda sin `items` y con `parseItemsFromNotes: true`. El servidor analiza `notes` con OpenAI, limitado al catálogo activo de esa empresa, valida nuevamente cada ID, y solo entonces registra la comanda. No uses productos ficticios ni serialices `items` como texto JSON.
+
+```json
+{
+  "businessId": "krokanticas",
+  "contactId": "uuid-contacto",
+  "deliveryType": "Retiro",
+  "paymentMethod": "Efectivo",
+  "shippingCost": 0,
+  "time": "Ahora",
+  "parseItemsFromNotes": true,
+  "notes": "Historial completo que termina con la confirmación del cliente"
+}
+```
+
+Configurar `OPENAI_API_KEY` y, opcionalmente, `OPENAI_ORDER_PARSER_MODEL` solo como variables de entorno del servidor. No enviar esa clave desde n8n ni el navegador.
+
 ```json
 {
   "businessId": "krokanticas",
