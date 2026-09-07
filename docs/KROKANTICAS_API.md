@@ -79,7 +79,7 @@ Cada comanda exige un `contactId` válido de la misma empresa. Al crearla, el se
 
 ### Recuperación de ítems desde historial de n8n
 
-Solo cuando n8n no pudo resolver las variedades, puede enviar una comanda sin `items` y con `parseItemsFromNotes: true`. El servidor analiza `notes` con OpenAI, limitado al catálogo activo de esa empresa, valida nuevamente cada ID, y solo entonces registra la comanda. No uses productos ficticios ni serialices `items` como texto JSON.
+Solo cuando n8n no pudo resolver las variedades, puede enviar una comanda sin `items` y con `parseItemsFromNotes: true`. El servidor analiza el historial enviado en `notes` con OpenAI, limitado al catálogo activo de esa empresa, valida nuevamente cada ID, y solo entonces registra la comanda. El historial completo no se guarda ni se muestra en Cocina: se conserva únicamente una observación breve si hay una indicación excepcional útil (por ejemplo, "Sin cebolla" o "Llamar al llegar"). No uses productos ficticios ni serialices `items` como texto JSON.
 
 ```json
 {

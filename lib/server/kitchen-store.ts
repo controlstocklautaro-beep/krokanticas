@@ -338,7 +338,11 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
 
   const parseItemsFromNotes = body.parseItemsFromNotes === true || body.parse_items_from_notes === true;
   if ((!Array.isArray(body.items) || body.items.length === 0) && parseItemsFromNotes) {
-    body.items = await parseOrderItemsFromNotes(String(body.notes || ""), allProducts);
+    const parsedOrder = await parseOrderItemsFromNotes(String(body.notes || ""), allProducts);
+    body.items = parsedOrder.items;
+    // The incoming notes are an n8n conversation history. Persist only the
+    // concise operational note derived from it, never the full history.
+    body.notes = parsedOrder.notes || undefined;
   }
   if (!Array.isArray(body.items) || body.items.length === 0) {
     throw new ApiError("La comanda necesita al menos un producto (items)", 400);
