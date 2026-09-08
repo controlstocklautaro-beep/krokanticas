@@ -748,6 +748,8 @@
 
 /* Cuerpo de Mensajes */
 .k-wa-messages-body { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; overflow-anchor:none; padding:16px 24px; display:flex; flex-direction:column; gap:10px; background-color:#f6f1e8; background-image:radial-gradient(#b854160d 1px, transparent 1px); background-size:20px 20px; }
+.k-wa-date-divider { display:flex; justify-content:center; align-items:center; margin:10px 0 6px; width:100%; pointer-events:none; user-select:none; }
+.k-wa-date-pill { display:inline-flex; align-items:center; justify-content:center; padding:4px 12px; border-radius:8px; background:#ffffff; color:#63574e; font-size:11.5px; font-weight:700; box-shadow:0 1px 2px #4a321714; border:1px solid #e5dbcf; letter-spacing:.01em; }
 .k-wa-bubble-wrap { display:flex; width:100%; }
 .k-wa-bubble-wrap.out { justify-content:flex-end; }
 .k-wa-bubble-wrap.in { justify-content:flex-start; }

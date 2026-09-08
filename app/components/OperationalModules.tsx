@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -307,6 +307,31 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   function formatTime(timestamp: number) {
     const d = new Date(timestamp);
     return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function getDayKey(timestamp: number) {
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function formatChatDateBadge(timestamp: number) {
+    const msgDate = new Date(timestamp);
+    const now = new Date();
+
+    const startOfMsgDay = new Date(msgDate.getFullYear(), msgDate.getMonth(), msgDate.getDate()).getTime();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const diffDays = Math.round((startOfToday - startOfMsgDay) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Hoy";
+    if (diffDays === 1) return "Ayer";
+    if (diffDays > 1 && diffDays < 7) {
+      const weekday = msgDate.toLocaleDateString("es-AR", { weekday: "long" });
+      return weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    }
+    if (msgDate.getFullYear() === now.getFullYear()) {
+      return msgDate.toLocaleDateString("es-AR", { day: "numeric", month: "long" });
+    }
+    return msgDate.toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
   }
 
   function getTagColor(tagName: string) {
@@ -653,37 +678,47 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
             {/* Cuerpo de Mensajes con Fondo WhatsApp */}
             <div className="k-wa-messages-body" ref={messagesBodyRef}>
-              {messages.map((item) => {
+              {messages.map((item, index) => {
                 const isOut = item.sender === "agent";
-                return (
-                  <div key={item.id} className={`k-wa-bubble-wrap ${isOut ? "out" : "in"}`}>
-                    <div className={`k-wa-bubble ${isOut ? "bubble-out" : "bubble-in"} ${item.type === "audio" && !item.media_deleted ? "has-audio" : ""}`}>
-                      {item.media_deleted && (item.type === "image" || item.type === "audio") ? (
-                        <em className="k-wa-expired">Archivo vencido</em>
-                      ) : item.type === "image" ? (
-                        <Image
-                          src={item.message}
-                          alt="Imagen enviada"
-                          className="k-wa-img-msg"
-                          width={360}
-                          height={260}
-                          unoptimized
-                          onClick={() => setPreviewImage(item.message)}
-                        />
-                      ) : item.type === "audio" ? (
-                        <audio controls preload="metadata" src={item.message} className="k-wa-audio-msg">
-                          Tu navegador no puede reproducir este audio.
-                        </audio>
-                      ) : (
-                        <span className="k-wa-text-msg">{item.message}</span>
-                      )}
+                const prevItem = index > 0 ? messages[index - 1] : null;
+                const showDateDivider = !prevItem || getDayKey(item.created_at) !== getDayKey(prevItem.created_at);
 
-                      <div className="k-wa-meta">
-                        <time>{formatTime(item.created_at)}</time>
-                        {isOut && <span className="k-wa-ticks">✓✓</span>}
+                return (
+                  <Fragment key={item.id}>
+                    {showDateDivider && (
+                      <div className="k-wa-date-divider">
+                        <span className="k-wa-date-pill">{formatChatDateBadge(item.created_at)}</span>
+                      </div>
+                    )}
+                    <div className={`k-wa-bubble-wrap ${isOut ? "out" : "in"}`}>
+                      <div className={`k-wa-bubble ${isOut ? "bubble-out" : "bubble-in"} ${item.type === "audio" && !item.media_deleted ? "has-audio" : ""}`}>
+                        {item.media_deleted && (item.type === "image" || item.type === "audio") ? (
+                          <em className="k-wa-expired">Archivo vencido</em>
+                        ) : item.type === "image" ? (
+                          <Image
+                            src={item.message}
+                            alt="Imagen enviada"
+                            className="k-wa-img-msg"
+                            width={360}
+                            height={260}
+                            unoptimized
+                            onClick={() => setPreviewImage(item.message)}
+                          />
+                        ) : item.type === "audio" ? (
+                          <audio controls preload="metadata" src={item.message} className="k-wa-audio-msg">
+                            Tu navegador no puede reproducir este audio.
+                          </audio>
+                        ) : (
+                          <span className="k-wa-text-msg">{item.message}</span>
+                        )}
+
+                        <div className="k-wa-meta">
+                          <time>{formatTime(item.created_at)}</time>
+                          {isOut && <span className="k-wa-ticks">✓✓</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  </Fragment>
                 );
               })}
 

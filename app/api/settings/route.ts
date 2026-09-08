@@ -177,7 +177,7 @@ export async function PATCH(req: Request) {
     const businessId = businessIdFrom(req, body.businessId);
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager", "staff"] });
     const delay = body.delayMinutes === undefined ? null : Number(body.delayMinutes);
-    if (delay !== null && ![15, 30, 45].includes(delay)) throw new ApiError("La demora debe ser 15, 30 o 45", 400);
+    if (delay !== null && ![5, 15, 30, 45].includes(delay)) throw new ApiError("La demora debe ser 5, 15, 30 o 45", 400);
 
     const activeAlias = body.activeAlias !== undefined ? (Number(body.activeAlias) === 2 ? 2 : 1) : null;
     const shippingZonesJson = Array.isArray(body.shippingZones) ? JSON.stringify(body.shippingZones) : null;

@@ -544,10 +544,16 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
         <strong>Local</strong>
         <small>Tocá para alternar</small>
       </button>
-      <button onClick={() => updateSettings({ delayMinutes: settings?.delay_minutes === 15 ? 30 : settings?.delay_minutes === 30 ? 45 : 15 })}>
+      <button
+        onClick={() => {
+          const curr = settings?.delay_minutes;
+          const next = curr === 5 ? 15 : curr === 15 ? 30 : curr === 30 ? 45 : 5;
+          updateSettings({ delayMinutes: next });
+        }}
+      >
         <span>DEMORA</span>
         <strong>{settings?.delay_minutes ?? 30} min</strong>
-        <small>15, 30 o 45 minutos</small>
+        <small>5, 15, 30 o 45 minutos</small>
       </button>
       <button className={settings?.courier_active ? "on" : "off"} onClick={() => updateSettings({ courierActive: !settings?.courier_active })}>
         <span>CADETE</span>
@@ -1921,13 +1927,14 @@ function SettingsModule({ businessId }: { businessId: string }) {
           <button
             disabled={saving}
             onClick={() => {
-              const next = settings?.delay_minutes === 15 ? 30 : settings?.delay_minutes === 30 ? 45 : 15;
+              const curr = settings?.delay_minutes;
+              const next = curr === 5 ? 15 : curr === 15 ? 30 : curr === 30 ? 45 : 5;
               update({ delayMinutes: next }, `Demora actualizada a ${next} min`);
             }}
           >
             <span>DEMORA ACTUAL</span>
             <strong>{settings?.delay_minutes ?? 30} min</strong>
-            <small>Rotar a 15, 30 o 45 min</small>
+            <small>Rotar a 5, 15, 30 o 45 min</small>
           </button>
 
           <button
