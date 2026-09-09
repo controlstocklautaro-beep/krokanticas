@@ -967,7 +967,7 @@ export function CustomersModule({ businessId }: { businessId: string }) {
       </div>
       {editing && (
         <div className="modal-backdrop" onMouseDown={() => setEditing(null)}>
-          <form className="modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}>
+          <form className="modal k-modal" onSubmit={save} onMouseDown={(event) => event.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <span className="eyebrow">CONTACTOS</span>
