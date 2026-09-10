@@ -14,7 +14,13 @@ export async function POST(req: Request) {
     const phoneNumber = normalizePhone(body.phone_number);
     if (typeof body.agent_active !== "boolean") throw new ApiError("Parámetros inválidos", 400);
     const chat = await getChat(businessId, phoneNumber);
-    await upsertChat(businessId, phoneNumber, chat?.user_name ?? phoneNumber);
+    let userName = chat?.user_name;
+    if (!userName) {
+      const contact = await getD1().prepare("SELECT name FROM contacts WHERE business_id = ? AND phone_number = ?")
+        .bind(businessId, phoneNumber).first<{ name: string }>();
+      userName = contact?.name ?? phoneNumber;
+    }
+    await upsertChat(businessId, phoneNumber, userName);
     const active = body.agent_active ? 1 : 0;
     const db = getD1();
     await db.batch([

@@ -284,6 +284,7 @@
 .k-module .data-head { min-height:46px; font-size:11px; }
 .k-module .customer-cell strong { font-size:14px; }
 .k-module .state-pill { padding:6px 9px; font-size:11px; }
+.k-module .state-pill.clickable-pill { display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:750; border-radius:12px; cursor:pointer; }
 .k-module .row-actions button,.k-module .tag-admin-card button { min-height:34px; padding:0 10px; font-size:11px; }
 
 /* Stock. */

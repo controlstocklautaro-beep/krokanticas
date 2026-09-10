@@ -12,11 +12,15 @@ export async function GET(req: Request) {
     const result = phoneNumber ? await getD1().prepare(`
       SELECT id, phone_number, name, email, address, notes, agent_active, created_at, updated_at
       FROM contacts WHERE business_id = ? AND phone_number = ? ORDER BY created_at DESC
-    `).bind(businessId, phoneNumber).all() : await getD1().prepare(`
+    `).bind(businessId, phoneNumber).all<Record<string, unknown>>() : await getD1().prepare(`
       SELECT id, phone_number, name, email, address, notes, agent_active, created_at, updated_at
       FROM contacts WHERE business_id = ? ORDER BY created_at DESC
-    `).bind(businessId).all();
-    return NextResponse.json({ contacts: result.results });
+    `).bind(businessId).all<Record<string, unknown>>();
+    const contacts = result.results.map((contact) => ({
+      ...contact,
+      agent_active: Boolean(contact.agent_active),
+    }));
+    return NextResponse.json({ contacts });
   } catch (error) {
     return apiErrorResponse(error, "Error listando contactos");
   }
@@ -24,7 +28,15 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json() as { businessId?: string; name?: string; phone_number?: string; email?: string; address?: string; notes?: string };
+    const body = await req.json() as {
+      businessId?: string;
+      name?: string;
+      phone_number?: string;
+      email?: string;
+      address?: string;
+      notes?: string;
+      agent_active?: boolean;
+    };
     const businessId = businessIdFrom(req, body.businessId);
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager", "reception"] });
     const name = body.name?.trim();
@@ -32,17 +44,18 @@ export async function POST(req: Request) {
     const phoneNumber = normalizePhone(body.phone_number);
     const id = crypto.randomUUID();
     const now = Date.now();
+    const active = body.agent_active !== false ? 1 : 0;
     const db = getD1();
     await db.batch([
       db.prepare(`
         INSERT INTO contacts (id, business_id, phone_number, name, email, address, notes, agent_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-      `).bind(id, businessId, phoneNumber, name, body.email?.trim() || null, body.address?.trim() || null, body.notes?.trim() || null, now, now),
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(id, businessId, phoneNumber, name, body.email?.trim() || null, body.address?.trim() || null, body.notes?.trim() || null, active, now, now),
       db.prepare(`
         INSERT INTO chats (id, business_id, phone_number, user_name, agent_active, updated_at)
-        VALUES (?, ?, ?, ?, 1, ?)
-        ON CONFLICT(business_id, phone_number) DO UPDATE SET user_name = excluded.user_name, updated_at = excluded.updated_at
-      `).bind(`${businessId}:${phoneNumber}`, businessId, phoneNumber, name, now),
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(business_id, phone_number) DO UPDATE SET user_name = excluded.user_name, agent_active = excluded.agent_active, updated_at = excluded.updated_at
+      `).bind(`${businessId}:${phoneNumber}`, businessId, phoneNumber, name, active, now),
     ]);
     return NextResponse.json({ success: true, id }, { status: 201 });
   } catch (error) {
@@ -68,6 +81,8 @@ export async function PATCH(req: Request) {
       direccion?: string;
       notes?: string;
       notas?: string;
+      agent_active?: boolean;
+      agentActive?: boolean;
     };
     const businessId = businessIdFrom(req, body.businessId);
     await requireBusinessAccess(req, businessId, { allowIntegration: true, roles: ["owner", "admin", "manager", "reception"] });
@@ -82,10 +97,10 @@ export async function PATCH(req: Request) {
 
     const db = getD1();
     const current = contactId
-      ? await db.prepare("SELECT id, phone_number, name, email, address, notes FROM contacts WHERE id = ? AND business_id = ?")
-          .bind(contactId, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null }>()
-      : await db.prepare("SELECT id, phone_number, name, email, address, notes FROM contacts WHERE phone_number = ? AND business_id = ?")
-          .bind(normalizedLookupPhone, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null }>();
+      ? await db.prepare("SELECT id, phone_number, name, email, address, notes, agent_active FROM contacts WHERE id = ? AND business_id = ?")
+          .bind(contactId, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null; agent_active: number }>()
+      : await db.prepare("SELECT id, phone_number, name, email, address, notes, agent_active FROM contacts WHERE phone_number = ? AND business_id = ?")
+          .bind(normalizedLookupPhone, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null; agent_active: number }>();
 
     if (!current) throw new ApiError("Contacto no encontrado", 404);
 
@@ -98,16 +113,24 @@ export async function PATCH(req: Request) {
     const notes = rawNotes !== undefined ? (rawNotes.trim() || null) : current.notes;
     const email = body.email !== undefined ? (body.email.trim() || null) : current.email;
 
+    const rawAgentActive = body.agent_active ?? body.agentActive;
+    const agentActive = typeof rawAgentActive === "boolean"
+      ? (rawAgentActive ? 1 : 0)
+      : (rawAgentActive !== undefined ? (Number(rawAgentActive) ? 1 : 0) : (current.agent_active ? 1 : 0));
+
     const now = Date.now();
     await db.batch([
-      db.prepare("UPDATE contacts SET phone_number = ?, name = ?, email = ?, address = ?, notes = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-        .bind(targetPhone, name, email, address, notes, now, current.id, businessId),
-      db.prepare("UPDATE chats SET user_name = ?, phone_number = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
-        .bind(name, targetPhone, now, businessId, current.phone_number),
+      db.prepare("UPDATE contacts SET phone_number = ?, name = ?, email = ?, address = ?, notes = ?, agent_active = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+        .bind(targetPhone, name, email, address, notes, agentActive, now, current.id, businessId),
+      db.prepare(`
+        INSERT INTO chats (id, business_id, phone_number, user_name, agent_active, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(business_id, phone_number) DO UPDATE SET user_name = excluded.user_name, agent_active = excluded.agent_active, updated_at = excluded.updated_at
+      `).bind(`${businessId}:${targetPhone}`, businessId, targetPhone, name, agentActive, now),
       db.prepare("UPDATE messages SET phone_number = ? WHERE business_id = ? AND phone_number = ?")
         .bind(targetPhone, businessId, current.phone_number),
     ]);
-    return NextResponse.json({ success: true, contact: { id: current.id, phone_number: targetPhone, name, address, notes, email } });
+    return NextResponse.json({ success: true, contact: { id: current.id, phone_number: targetPhone, name, address, notes, email, agent_active: Boolean(agentActive) } });
   } catch (error) {
     return apiErrorResponse(error, "Error actualizando contacto");
   }

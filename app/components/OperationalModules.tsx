@@ -830,6 +830,7 @@ export function CustomersModule({ businessId }: { businessId: string }) {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const [togglingPhone, setTogglingPhone] = useState<string | null>(null);
 
   async function reload() {
     const data = await api<{ contacts: ContactRecord[] }>(`/api/contacts?businessId=${encodeURIComponent(businessId)}`);
@@ -842,9 +843,34 @@ export function CustomersModule({ businessId }: { businessId: string }) {
       .catch((loadError) => setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
   }, [businessId]);
 
+  async function toggleBot(contact: ContactRecord) {
+    const next = !contact.agent_active;
+    setTogglingPhone(contact.phone_number);
+    setContacts((current) =>
+      current.map((item) => (item.id === contact.id ? { ...item, agent_active: next } : item))
+    );
+    try {
+      await api("/api/toggle-bot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          phone_number: contact.phone_number,
+          agent_active: next,
+        }),
+      });
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : "Error al cambiar estado del bot");
+      await reload();
+    } finally {
+      setTogglingPhone(null);
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const agentActive = form.get("agent_active") === "on";
     const payload = {
       businessId,
       id: typeof editing === "object" && editing ? editing.id : undefined,
@@ -853,6 +879,7 @@ export function CustomersModule({ businessId }: { businessId: string }) {
       email: form.get("email"),
       address: form.get("address"),
       notes: form.get("notes"),
+      agent_active: agentActive,
     };
     try {
       await api("/api/contacts", {
@@ -930,25 +957,47 @@ export function CustomersModule({ businessId }: { businessId: string }) {
             <span>BOT</span>
             <span>ACCIONES</span>
           </div>
-          {paginated.map((contact) => (
-            <div className="data-row contacts-grid" key={contact.id}>
-              <span className="customer-cell">
-                <i className="guest-avatar">{initials(contact.name)}</i>
-                <strong>{contact.name}</strong>
-              </span>
-              <span>{contact.phone_number}</span>
-              <span>{contact.address || "—"}</span>
-              <span>
-                <b className={contact.agent_active ? "state-pill on" : "state-pill off"}>
-                  {contact.agent_active ? "Bot ON" : "Bot OFF"}
-                </b>
-              </span>
-              <span className="row-actions">
-                <button onClick={() => setEditing(contact)}>Editar</button>
-                <button onClick={() => remove(contact)}>Eliminar</button>
-              </span>
-            </div>
-          ))}
+          {paginated.map((contact) => {
+            const isToggling = togglingPhone === contact.phone_number;
+            return (
+              <div className="data-row contacts-grid" key={contact.id}>
+                <span className="customer-cell">
+                  <i className="guest-avatar">{initials(contact.name)}</i>
+                  <strong>{contact.name}</strong>
+                </span>
+                <span>{contact.phone_number}</span>
+                <span>{contact.address || "—"}</span>
+                <span>
+                  <button
+                    type="button"
+                    className={`state-pill clickable-pill ${contact.agent_active ? "on" : "off"}`}
+                    onClick={() => toggleBot(contact)}
+                    disabled={isToggling}
+                    title={
+                      contact.agent_active
+                        ? "Hacé clic para apagar el bot (atención manual)"
+                        : "Hacé clic para encender el bot (asistente de IA)"
+                    }
+                  >
+                    <Bot size={13} aria-hidden />
+                    {contact.agent_active ? "Bot ON" : "Bot OFF"}
+                  </button>
+                </span>
+                <span className="row-actions">
+                  <button type="button" onClick={() => setEditing(contact)}>Editar</button>
+                  <button
+                    type="button"
+                    onClick={() => toggleBot(contact)}
+                    disabled={isToggling}
+                    title={contact.agent_active ? "Apagar bot para este contacto" : "Prender bot para este contacto"}
+                  >
+                    {contact.agent_active ? "Pausar bot" : "Prender bot"}
+                  </button>
+                  <button type="button" onClick={() => remove(contact)}>Eliminar</button>
+                </span>
+              </div>
+            );
+          })}
           {!filtered.length && <div className="empty-table">No se encontraron contactos.</div>}
         </div>
         <PaginationControls
@@ -1000,6 +1049,25 @@ export function CustomersModule({ businessId }: { businessId: string }) {
             <label>
               Notas
               <textarea name="notes" defaultValue={editing === "new" ? "" : editing.notes || ""} />
+            </label>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "9px",
+                margin: "12px 0 6px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 600,
+              }}
+            >
+              <input
+                type="checkbox"
+                name="agent_active"
+                defaultChecked={editing === "new" ? true : Boolean(editing.agent_active)}
+                style={{ width: "18px", height: "18px", accentColor: "#1e805f", cursor: "pointer" }}
+              />
+              <span>Bot de IA activo (asistente automático)</span>
             </label>
             <div className="modal-actions">
               <button type="button" className="secondary" onClick={() => setEditing(null)}>
