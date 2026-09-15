@@ -22,6 +22,7 @@ type ChatRecord = {
   phone_number: string;
   user_name: string;
   agent_active: boolean;
+  bot_paused_at?: number | null;
   updated_at: number;
   tags: string[];
   last_message?: string | null;
@@ -52,6 +53,7 @@ type ContactRecord = {
   address?: string | null;
   notes?: string | null;
   agent_active: boolean;
+  bot_paused_at?: number | null;
   updated_at: number;
 };
 
@@ -590,7 +592,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                 </div>
                 <div className="k-wa-header-status">
                   <span className={`k-wa-status-dot ${selectedChat.agent_active ? "active" : ""}`} />
-                  <small>{selectedChat.agent_active ? "Bot de IA activo" : "Atención humana"}</small>
+                  <small>{selectedChat.agent_active ? "Bot de IA activo" : "Atención manual (se reactiva en 1h)"}</small>
                 </div>
               </div>
 
@@ -600,7 +602,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
                 <button
                   className={`k-wa-toggle-bot ${selectedChat.agent_active ? "active" : ""}`}
                   onClick={toggleBot}
-                  title={selectedChat.agent_active ? "Pausar bot para intervenir como humano" : "Activar bot para que responda la IA"}
+                  title={selectedChat.agent_active ? "Pausar bot para intervenir como humano (se reactivará solo en 1 hora)" : "Activar bot para que responda la IA"}
                 >
                   {selectedChat.agent_active ? <><Bot size={16} aria-hidden /> Bot ON</> : <><UserRound size={16} aria-hidden /> Manual</>}
                 </button>
@@ -975,7 +977,7 @@ export function CustomersModule({ businessId }: { businessId: string }) {
                     disabled={isToggling}
                     title={
                       contact.agent_active
-                        ? "Hacé clic para apagar el bot (atención manual)"
+                        ? "Hacé clic para apagar el bot (atención manual, se reactiva solo en 1h)"
                         : "Hacé clic para encender el bot (asistente de IA)"
                     }
                   >
@@ -989,7 +991,7 @@ export function CustomersModule({ businessId }: { businessId: string }) {
                     type="button"
                     onClick={() => toggleBot(contact)}
                     disabled={isToggling}
-                    title={contact.agent_active ? "Apagar bot para este contacto" : "Prender bot para este contacto"}
+                    title={contact.agent_active ? "Apagar bot para este contacto (se reactiva solo en 1h)" : "Prender bot para este contacto"}
                   >
                     {contact.agent_active ? "Pausar bot" : "Prender bot"}
                   </button>

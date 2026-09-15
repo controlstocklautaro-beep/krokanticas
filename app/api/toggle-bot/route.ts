@@ -21,15 +21,17 @@ export async function POST(req: Request) {
       userName = contact?.name ?? phoneNumber;
     }
     await upsertChat(businessId, phoneNumber, userName);
+    const now = Date.now();
     const active = body.agent_active ? 1 : 0;
+    const botPausedAt = body.agent_active ? null : now;
     const db = getD1();
     await db.batch([
-      db.prepare("UPDATE chats SET agent_active = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
-        .bind(active, Date.now(), businessId, phoneNumber),
-      db.prepare("UPDATE contacts SET agent_active = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
-        .bind(active, Date.now(), businessId, phoneNumber),
+      db.prepare("UPDATE chats SET agent_active = ?, bot_paused_at = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
+        .bind(active, botPausedAt, now, businessId, phoneNumber),
+      db.prepare("UPDATE contacts SET agent_active = ?, bot_paused_at = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
+        .bind(active, botPausedAt, now, businessId, phoneNumber),
     ]);
-    return NextResponse.json({ success: true, agent_active: body.agent_active });
+    return NextResponse.json({ success: true, agent_active: body.agent_active, bot_paused_at: botPausedAt });
   } catch (error) {
     return apiErrorResponse(error, "Error en toggle-bot");
   }

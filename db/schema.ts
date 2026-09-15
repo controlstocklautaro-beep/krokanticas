@@ -98,6 +98,7 @@ export const contacts = sqliteTable("contacts", {
   address: text("address"),
   notes: text("notes"),
   agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(1),
+  botPausedAt: integer("bot_paused_at"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 }, (table) => [
@@ -111,6 +112,7 @@ export const chats = sqliteTable("chats", {
   phoneNumber: text("phone_number").notNull(),
   userName: text("user_name").notNull(),
   agentActive: integer("agent_active", { mode: "boolean" }).notNull().default(1),
+  botPausedAt: integer("bot_paused_at"),
   updatedAt: integer("updated_at").notNull(),
 }, (table) => [
   uniqueIndex("chats_business_phone_uq").on(table.businessId, table.phoneNumber),

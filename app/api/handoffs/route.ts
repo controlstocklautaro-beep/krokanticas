@@ -27,7 +27,10 @@ export async function POST(req: Request) {
     if (body.contactId) {
       const contact = await getD1().prepare("SELECT name, phone_number FROM contacts WHERE id = ? AND business_id = ?").bind(body.contactId, businessId).first<{ name: string; phone_number: string }>();
       if (!contact) throw new ApiError("Contacto no encontrado", 404);
-      customerName = customerName || contact.name; phoneNumber = phoneNumber || contact.phone_number;
+      customerName = contact.name || customerName; phoneNumber = phoneNumber || contact.phone_number;
+    } else if (phoneNumber) {
+      const contact = await getD1().prepare("SELECT name FROM contacts WHERE phone_number = ? AND business_id = ?").bind(phoneNumber, businessId).first<{ name: string }>();
+      if (contact?.name) customerName = contact.name;
     }
     if (body.orderId) {
       const order = await getD1().prepare("SELECT customer_name, phone_number FROM orders WHERE id = ? AND business_id = ?").bind(body.orderId, businessId).first<{ customer_name: string; phone_number: string }>();

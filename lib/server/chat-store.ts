@@ -4,10 +4,50 @@ export type StoredChat = {
   phone_number: string;
   user_name: string;
   agent_active: number;
+  bot_paused_at?: number | null;
   updated_at: number;
 };
 
 export const WHATSAPP_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const BOT_PAUSE_DURATION_MS = 60 * 60 * 1000; // 1 hora de pausa antes de reactivar automáticamente
+
+export async function autoReactivateExpiredBots(businessId: string, phoneNumber?: string) {
+  const db = getD1();
+  const threshold = Date.now() - BOT_PAUSE_DURATION_MS;
+  const now = Date.now();
+
+  try {
+    if (phoneNumber) {
+      await db.batch([
+        db.prepare(`
+          UPDATE chats SET agent_active = 1, bot_paused_at = NULL, updated_at = ?
+          WHERE business_id = ? AND phone_number = ? AND agent_active = 0
+            AND ((bot_paused_at IS NOT NULL AND bot_paused_at <= ?) OR (bot_paused_at IS NULL AND updated_at <= ?))
+        `).bind(now, businessId, phoneNumber, threshold, threshold),
+        db.prepare(`
+          UPDATE contacts SET agent_active = 1, bot_paused_at = NULL, updated_at = ?
+          WHERE business_id = ? AND phone_number = ? AND agent_active = 0
+            AND ((bot_paused_at IS NOT NULL AND bot_paused_at <= ?) OR (bot_paused_at IS NULL AND updated_at <= ?))
+        `).bind(now, businessId, phoneNumber, threshold, threshold),
+      ]);
+    } else {
+      await db.batch([
+        db.prepare(`
+          UPDATE chats SET agent_active = 1, bot_paused_at = NULL, updated_at = ?
+          WHERE business_id = ? AND agent_active = 0
+            AND ((bot_paused_at IS NOT NULL AND bot_paused_at <= ?) OR (bot_paused_at IS NULL AND updated_at <= ?))
+        `).bind(now, businessId, threshold, threshold),
+        db.prepare(`
+          UPDATE contacts SET agent_active = 1, bot_paused_at = NULL, updated_at = ?
+          WHERE business_id = ? AND agent_active = 0
+            AND ((bot_paused_at IS NOT NULL AND bot_paused_at <= ?) OR (bot_paused_at IS NULL AND updated_at <= ?))
+        `).bind(now, businessId, threshold, threshold),
+      ]);
+    }
+  } catch {
+    // Si la columna bot_paused_at no estuviese disponible, no romper el flujo
+  }
+}
 
 export async function whatsappReplyWindow(businessId: string, phoneNumber: string, now = Date.now()) {
   const latest = await getD1().prepare(`
@@ -23,16 +63,25 @@ export async function whatsappReplyWindow(businessId: string, phoneNumber: strin
 }
 
 export async function getChat(businessId: string, phoneNumber: string) {
-  return getD1().prepare("SELECT phone_number, user_name, agent_active, updated_at FROM chats WHERE business_id = ? AND phone_number = ?")
+  return getD1().prepare("SELECT phone_number, user_name, agent_active, bot_paused_at, updated_at FROM chats WHERE business_id = ? AND phone_number = ?")
     .bind(businessId, phoneNumber).first<StoredChat>();
 }
 
 export async function upsertChat(businessId: string, phoneNumber: string, userName: string, timestamp = Date.now()) {
-  await getD1().prepare(`
+  const db = getD1();
+  const contact = await db.prepare("SELECT name FROM contacts WHERE business_id = ? AND phone_number = ?")
+    .bind(businessId, phoneNumber).first<{ name: string }>();
+  const chat = await db.prepare("SELECT user_name FROM chats WHERE business_id = ? AND phone_number = ?")
+    .bind(businessId, phoneNumber).first<{ user_name: string }>();
+  const establishedName = contact?.name?.trim() || chat?.user_name?.trim() || userName;
+
+  await db.prepare(`
     INSERT INTO chats (id, business_id, phone_number, user_name, agent_active, updated_at)
     VALUES (?, ?, ?, ?, 1, ?)
-    ON CONFLICT(business_id, phone_number) DO UPDATE SET user_name = excluded.user_name, updated_at = excluded.updated_at
-  `).bind(`${businessId}:${phoneNumber}`, businessId, phoneNumber, userName, timestamp).run();
+    ON CONFLICT(business_id, phone_number) DO UPDATE SET
+      user_name = excluded.user_name,
+      updated_at = excluded.updated_at
+  `).bind(`${businessId}:${phoneNumber}`, businessId, phoneNumber, establishedName, timestamp).run();
 }
 
 export async function ensureContact(businessId: string, phoneNumber: string, requestedName?: string) {
@@ -40,8 +89,10 @@ export async function ensureContact(businessId: string, phoneNumber: string, req
   const existing = await db.prepare("SELECT id, name FROM contacts WHERE business_id = ? AND phone_number = ?")
     .bind(businessId, phoneNumber).first<{ id: string; name: string }>();
   if (existing) return existing;
+  const existingChat = await db.prepare("SELECT user_name FROM chats WHERE business_id = ? AND phone_number = ?")
+    .bind(businessId, phoneNumber).first<{ user_name: string }>();
   const id = crypto.randomUUID();
-  const name = requestedName?.trim() || phoneNumber;
+  const name = existingChat?.user_name?.trim() || requestedName?.trim() || phoneNumber;
   const now = Date.now();
   await db.prepare("INSERT INTO contacts (id, business_id, phone_number, name, agent_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)")
     .bind(id, businessId, phoneNumber, name, now, now).run();

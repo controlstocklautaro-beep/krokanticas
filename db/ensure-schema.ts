@@ -18,9 +18,9 @@ const statements = [
   `CREATE UNIQUE INDEX IF NOT EXISTS password_reset_tokens_hash_uq ON password_reset_tokens (token_hash)`,
   `CREATE INDEX IF NOT EXISTS password_reset_tokens_user_idx ON password_reset_tokens (user_id)`,
   `CREATE INDEX IF NOT EXISTS password_reset_tokens_expiry_idx ON password_reset_tokens (expires_at)`,
-  `CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, name TEXT NOT NULL, email TEXT, address TEXT, notes TEXT, agent_active BIGINT NOT NULL DEFAULT 1, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, name TEXT NOT NULL, email TEXT, address TEXT, notes TEXT, agent_active BIGINT NOT NULL DEFAULT 1, bot_paused_at BIGINT, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS contacts_business_phone_uq ON contacts (business_id, phone_number)`,
-  `CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, user_name TEXT NOT NULL, agent_active INTEGER NOT NULL DEFAULT 1, updated_at INTEGER NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS chats (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, user_name TEXT NOT NULL, agent_active INTEGER NOT NULL DEFAULT 1, bot_paused_at BIGINT, updated_at INTEGER NOT NULL)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS chats_business_phone_uq ON chats (business_id, phone_number)`,
   `CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY NOT NULL, business_id TEXT NOT NULL, phone_number TEXT NOT NULL, message TEXT NOT NULL, sender TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'text', status TEXT, storage_path TEXT, content_type TEXT, media_deleted INTEGER NOT NULL DEFAULT 0, media_deleted_at INTEGER, created_at INTEGER NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS messages_business_phone_idx ON messages (business_id, phone_number)`,
@@ -83,5 +83,7 @@ export async function ensureSchema(): Promise<void> {
   await db.prepare("ALTER TABLE products ADD COLUMN IF NOT EXISTS made_to_order BIGINT NOT NULL DEFAULT 0").run();
   await db.prepare("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS cash_discount_enabled BIGINT NOT NULL DEFAULT 0").run();
   await db.prepare("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS cash_discount_percentage REAL NOT NULL DEFAULT 10").run();
+  await db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS bot_paused_at BIGINT").run();
+  await db.prepare("ALTER TABLE chats ADD COLUMN IF NOT EXISTS bot_paused_at BIGINT").run();
   schemaReady = true;
 }

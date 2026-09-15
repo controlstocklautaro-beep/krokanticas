@@ -280,17 +280,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     if (existing) {
       phoneNumber = phoneNumber || existing.phone_number;
       contactAddress = existing.address;
-      if (rawExplicitName) {
-        customerName = rawExplicitName;
-        if (rawExplicitName !== existing.name) {
-          await db.prepare("UPDATE contacts SET name = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-            .bind(rawExplicitName, now, existing.id, businessId).run();
-          await db.prepare("UPDATE chats SET user_name = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
-            .bind(rawExplicitName, now, businessId, existing.phone_number).run();
-        }
-      } else {
-        customerName = existing.name;
-      }
+      customerName = existing.name || rawExplicitName;
     } else {
       contactId = undefined;
     }
@@ -302,17 +292,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     if (existing) {
       contactId = existing.id;
       contactAddress = existing.address;
-      if (rawExplicitName) {
-        customerName = rawExplicitName;
-        if (rawExplicitName !== existing.name) {
-          await db.prepare("UPDATE contacts SET name = ?, updated_at = ? WHERE id = ? AND business_id = ?")
-            .bind(rawExplicitName, now, existing.id, businessId).run();
-          await db.prepare("UPDATE chats SET user_name = ?, updated_at = ? WHERE business_id = ? AND phone_number = ?")
-            .bind(rawExplicitName, now, businessId, existing.phone_number).run();
-        }
-      } else {
-        customerName = existing.name;
-      }
+      customerName = existing.name || rawExplicitName;
     } else {
       // Crear contacto automáticamente
       contactId = crypto.randomUUID();
@@ -322,7 +302,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
       await db.prepare(`
         INSERT INTO chats (id, business_id, phone_number, user_name, agent_active, updated_at)
         VALUES (?, ?, ?, ?, 1, ?)
-        ON CONFLICT(business_id, phone_number) DO UPDATE SET user_name = excluded.user_name, updated_at = excluded.updated_at
+        ON CONFLICT(business_id, phone_number) DO UPDATE SET updated_at = excluded.updated_at
       `).bind(`${businessId}:${phoneNumber}`, businessId, phoneNumber, customerName, now).run();
     }
   }
