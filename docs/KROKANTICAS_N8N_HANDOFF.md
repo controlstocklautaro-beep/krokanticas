@@ -1009,7 +1009,7 @@ Ejecución para Krokanticas:
 GET /api/cleanup-expired-media?businessId=krokanticas
 ```
 
-Los archivos de imagen y audio se conservan 90 días. La ruta procesa hasta 2.000 elementos por ejecución y deja el mensaje histórico marcado como archivo vencido.
+Los archivos de imagen y audio se conservan 7 días por defecto (configurable mediante `?days=7` o `?days=3` y `?limit=5000`). La ruta procesa hasta 5.000 elementos por ejecución mediante eliminación masiva en lotes de Supabase Storage y deja el mensaje histórico marcado como archivo vencido (`media_deleted = 1`), preservando todos los textos y datos de la comanda.
 
 ### 6.26 `GET /api/auth/status`
 

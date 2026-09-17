@@ -199,6 +199,12 @@ class SupabaseMediaBucket {
     const { error } = await this.bucket.remove([path]);
     if (error) throw new Error(`No se pudo eliminar el archivo: ${error.message}`);
   }
+
+  async deleteMany(paths: string[]): Promise<void> {
+    if (!paths.length) return;
+    const { error } = await this.bucket.remove(paths);
+    if (error) throw new Error(`No se pudieron eliminar los archivos: ${error.message}`);
+  }
 }
 
 const mediaBucket = new SupabaseMediaBucket();

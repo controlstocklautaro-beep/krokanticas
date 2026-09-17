@@ -1831,6 +1831,27 @@ function SettingsModule({ businessId }: { businessId: string }) {
   // Zonas de envío en edición
   const [zones, setZones] = useState<ShippingZone[]>([]);
 
+  // Limpieza de almacenamiento y comprobantes
+  const [cleaningDays, setCleaningDays] = useState(7);
+  const [cleaningRunning, setCleaningRunning] = useState(false);
+  const [cleaningResult, setCleaningResult] = useState<string | null>(null);
+
+  async function handleManualCleanup() {
+    setCleaningRunning(true);
+    setCleaningResult(null);
+    setError("");
+    try {
+      const res = await api<{ success: boolean; cleaned: number; retention_days: number; message: string }>(
+        `/api/cleanup-expired-media?businessId=${businessId}&days=${cleaningDays}`
+      );
+      setCleaningResult(res.message || `Se eliminaron ${res.cleaned} comprobantes viejos.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al ejecutar limpieza de almacenamiento");
+    } finally {
+      setCleaningRunning(false);
+    }
+  }
+
   useEffect(() => {
     let active = true;
     void api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`)
@@ -2267,6 +2288,82 @@ function SettingsModule({ businessId }: { businessId: string }) {
           >
             {saving ? "Guardando..." : "Guardar Tarifas de Envío"}
           </button>
+        </div>
+      </div>
+
+      {/* 6. Mantenimiento de Almacenamiento y Comprobantes */}
+      <div className="k-card" style={{ marginTop: "18px" }}>
+        <div className="k-card-head">
+          <div>
+            <span className="k-eyebrow">ALMACENAMIENTO Y SUPABASE</span>
+            <h2>Limpieza de Comprobantes e Imágenes</h2>
+          </div>
+          <span className="k-badge-active" style={{ background: "#e2f1ea", color: "#1e805f" }}>
+            AUTO-LIMPIEZA DIARIA PROGRAMADA
+          </span>
+        </div>
+
+        <div className="k-card-body">
+          <p className="k-config-desc">
+            El plan gratuito de Supabase incluye 1 GB de almacenamiento de archivos. Para no saturarlo ni tener que pagar un plan adicional, se limpian <b>únicamente las imágenes pesadas de comprobantes</b> con más de 7 días. <b>Todos los mensajes de texto, conversaciones y comandas de clientes no se tocan</b> y quedan 100% guardados en el historial (el texto casi no ocupa espacio).
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", margin: "16px 0" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <label style={{ fontSize: "13px", fontWeight: "700", color: "var(--k-brown)" }}>
+                Seleccioná qué antigüedad conservar (las anteriores se borrarán de Supabase Storage):
+              </label>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {[
+                  { d: 3, label: "3 días (Limpieza rápida / Máx. espacio)" },
+                  { d: 7, label: "7 días (Recomendado)" },
+                  { d: 14, label: "14 días (2 semanas)" },
+                  { d: 30, label: "30 días (1 mes)" },
+                ].map(({ d, label }) => (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`k-pct-btn ${cleaningDays === d ? "selected" : ""}`}
+                    onClick={() => setCleaningDays(d)}
+                    style={{ padding: "8px 14px", fontSize: "13px", minHeight: "36px" }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                className="k-primary"
+                disabled={cleaningRunning}
+                onClick={handleManualCleanup}
+                style={{
+                  minHeight: "44px",
+                  padding: "0 24px",
+                  fontSize: "14px",
+                  fontWeight: "700",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#a03322",
+                  borderColor: "#8a2a1b",
+                  color: "#fff",
+                  boxShadow: "0 4px 12px rgba(160, 51, 34, 0.25)",
+                }}
+              >
+                <Trash2 size={16} aria-hidden />
+                {cleaningRunning ? "Liberando espacio en Supabase..." : `🗑️ Limpiar fotos y comprobantes de más de ${cleaningDays} días ahora`}
+              </button>
+            </div>
+          </div>
+
+          {cleaningResult && (
+            <div className="k-success-banner" style={{ margin: "12px 0 0" }}>
+              {cleaningResult}
+            </div>
+          )}
         </div>
       </div>
     </div>

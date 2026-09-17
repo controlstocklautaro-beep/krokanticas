@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cleanup-expired-media",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}
