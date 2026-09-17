@@ -42,75 +42,102 @@ async function runCleanup(req: Request) {
 
   const cutoff = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
   const db = getD1();
+  const bucket = getMediaBucket();
+  const now = Date.now();
 
-  const query = businessId
-    ? db.prepare(`
-        SELECT id, storage_path FROM messages
-        WHERE business_id = ? AND created_at <= ? AND type = 'image' AND media_deleted = 0 AND storage_path IS NOT NULL
-        ORDER BY created_at ASC LIMIT ?
-      `).bind(businessId, cutoff, maxItems)
-    : db.prepare(`
-        SELECT id, storage_path FROM messages
-        WHERE created_at <= ? AND type = 'image' AND media_deleted = 0 AND storage_path IS NOT NULL
-        ORDER BY created_at ASC LIMIT ?
-      `).bind(cutoff, maxItems);
-
-  const records = await query.all<{ id: string; storage_path: string }>();
-
-  if (!records.results.length) {
-    return NextResponse.json({
-      success: true,
-      retention_days: retentionDays,
-      cutoff_date: new Date(cutoff).toISOString(),
-      scanned: 0,
-      cleaned: 0,
-      businessId: businessId ?? "all",
-      message: `No hay imágenes de comprobantes con más de ${retentionDays} días para eliminar.`,
-    });
+  // 1. Escaneo directo y borrado en Supabase Storage (elimina todas las imágenes viejas aunque no estén en messages)
+  let storageCleaned = 0;
+  try {
+    const storageResult = await bucket.scanAndCleanExpiredImages(cutoff, maxItems);
+    storageCleaned = storageResult.cleaned;
+  } catch (storageError) {
+    console.warn("Error en escaneo directo de storage:", storageError);
   }
 
-  const bucket = getMediaBucket();
-  const pathsToDelete = Array.from(new Set(records.results.map((r) => r.storage_path).filter(Boolean)));
-  let cleaned = 0;
+  // 2. Limpiar registros de mensajes multimedia en base de datos
+  let dbMessagesCount = 0;
+  try {
+    const query = businessId
+      ? db.prepare(`
+          SELECT id, storage_path FROM messages
+          WHERE business_id = ? AND created_at <= ? AND (type = 'image' OR storage_path IS NOT NULL) AND media_deleted = 0
+          ORDER BY created_at ASC LIMIT ?
+        `).bind(businessId, cutoff, maxItems)
+      : db.prepare(`
+          SELECT id, storage_path FROM messages
+          WHERE created_at <= ? AND (type = 'image' OR storage_path IS NOT NULL) AND media_deleted = 0
+          ORDER BY created_at ASC LIMIT ?
+        `).bind(cutoff, maxItems);
 
-  // Eliminación masiva por lotes en Supabase Storage (100 archivos por llamada en vez de 1 a 1)
-  for (let i = 0; i < pathsToDelete.length; i += BATCH_DELETE_CHUNK_SIZE) {
-    const chunk = pathsToDelete.slice(i, i + BATCH_DELETE_CHUNK_SIZE);
-    try {
-      await bucket.deleteMany(chunk);
-      cleaned += chunk.length;
-    } catch {
-      // Si falla un bloque masivo, intentamos de a uno para no detener el resto
-      for (const singlePath of chunk) {
+    const records = await query.all<{ id: string; storage_path: string | null }>();
+    dbMessagesCount = records.results.length;
+
+    if (records.results.length > 0) {
+      // Si hay storage_paths específicos que no se borraron en el escaneo
+      const pathsToDelete = Array.from(new Set(records.results.map((r) => r.storage_path).filter(Boolean))) as string[];
+      for (let i = 0; i < pathsToDelete.length; i += BATCH_DELETE_CHUNK_SIZE) {
+        const chunk = pathsToDelete.slice(i, i + BATCH_DELETE_CHUNK_SIZE);
         try {
-          await bucket.delete(singlePath);
-          cleaned++;
+          await bucket.deleteMany(chunk);
+          storageCleaned += chunk.length;
         } catch {
-          // Ignorar archivo si ya no existía
+          // Ya pudieron haber sido borrados en el escaneo
         }
       }
+
+      // Marcar registros en la base de datos como media_deleted = 1
+      const batchSize = 100;
+      for (let i = 0; i < records.results.length; i += batchSize) {
+        const chunk = records.results.slice(i, i + batchSize);
+        const updates: PreparedStatement[] = chunk.map((record) =>
+          db.prepare("UPDATE messages SET media_deleted = 1, media_deleted_at = ? WHERE id = ?").bind(now, record.id)
+        );
+        await db.batch(updates);
+      }
     }
+  } catch (dbError) {
+    console.warn("Error actualizando mensajes en BD:", dbError);
   }
 
-  // Actualizar registros en base de datos marcando media_deleted = 1
-  const now = Date.now();
-  const batchSize = 100;
-  for (let i = 0; i < records.results.length; i += batchSize) {
-    const chunk = records.results.slice(i, i + batchSize);
-    const updates: PreparedStatement[] = chunk.map((record) =>
-      db.prepare("UPDATE messages SET media_deleted = 1, media_deleted_at = ? WHERE id = ?").bind(now, record.id)
-    );
-    await db.batch(updates);
+  // 3. Limpiar URLs de comprobantes en comandas viejas (para no dejar links caídos, preservando el pedido)
+  let dbOrdersCount = 0;
+  try {
+    const ordersQuery = businessId
+      ? db.prepare(`SELECT id, receipt_url FROM orders WHERE business_id = ? AND created_at <= ? AND receipt_url IS NOT NULL LIMIT ?`).bind(businessId, cutoff, maxItems)
+      : db.prepare(`SELECT id, receipt_url FROM orders WHERE created_at <= ? AND receipt_url IS NOT NULL LIMIT ?`).bind(cutoff, maxItems);
+
+    const expiredOrders = await ordersQuery.all<{ id: string; receipt_url: string }>();
+    dbOrdersCount = expiredOrders.results.length;
+
+    if (expiredOrders.results.length > 0) {
+      const batchSize = 100;
+      for (let i = 0; i < expiredOrders.results.length; i += batchSize) {
+        const chunk = expiredOrders.results.slice(i, i + batchSize);
+        const updates: PreparedStatement[] = chunk.map((order) =>
+          db.prepare("UPDATE orders SET receipt_url = NULL, updated_at = ? WHERE id = ?").bind(now, order.id)
+        );
+        await db.batch(updates);
+      }
+    }
+  } catch (ordersError) {
+    console.warn("Error limpiando URLs de comandas:", ordersError);
   }
+
+  const totalCleaned = Math.max(storageCleaned, dbMessagesCount, dbOrdersCount);
 
   return NextResponse.json({
     success: true,
     retention_days: retentionDays,
     cutoff_date: new Date(cutoff).toISOString(),
-    scanned: records.results.length,
-    cleaned,
+    scanned: totalCleaned,
+    cleaned: totalCleaned,
+    storage_cleaned: storageCleaned,
+    messages_cleaned: dbMessagesCount,
+    orders_cleaned: dbOrdersCount,
     businessId: businessId ?? "all",
-    message: `Se eliminaron ${cleaned} imágenes de comprobantes con más de ${retentionDays} días de antigüedad en Supabase Storage. Los mensajes de texto e historial permanecen intactos.`,
+    message: totalCleaned > 0
+      ? `Se eliminaron ${totalCleaned} imágenes de comprobantes con más de ${retentionDays} días de antigüedad en Supabase Storage. Los mensajes de texto, chats y pedidos permanecen intactos.`
+      : `No se encontraron imágenes con más de ${retentionDays} días de antigüedad. El almacenamiento de Supabase ya está al día.`,
   });
 }
 

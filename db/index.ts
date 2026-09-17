@@ -205,6 +205,82 @@ class SupabaseMediaBucket {
     const { error } = await this.bucket.remove(paths);
     if (error) throw new Error(`No se pudieron eliminar los archivos: ${error.message}`);
   }
+
+  async scanAndCleanExpiredImages(cutoffTime: number, maxItems = 5000): Promise<{ cleaned: number; filesFound: number }> {
+    let cleaned = 0;
+    let filesFound = 0;
+
+    // Obtener lista de buckets a revisar
+    let bucketNames = [this.bucketName];
+    try {
+      const { data: bList } = await supabaseAdmin().storage.listBuckets();
+      if (bList && Array.isArray(bList)) {
+        bucketNames = Array.from(new Set([this.bucketName, ...bList.map((b) => b.name)]));
+      }
+    } catch {
+      // Usar bucketName por defecto si falla el listado
+    }
+
+    for (const bName of bucketNames) {
+      // Revisar el bucket de conversación o cualquiera con nombre de imágenes/comprobantes/media
+      const isTarget = bName === this.bucketName || /media|comprobante|receipt|image|conversat/i.test(bName);
+      if (!isTarget) continue;
+
+      const storageBucket = supabaseAdmin().storage.from(bName);
+      const toDelete: string[] = [];
+
+      const scanFolder = async (folder = "") => {
+        if (toDelete.length >= maxItems) return;
+        const { data, error } = await storageBucket.list(folder, {
+          limit: 1000,
+          sortBy: { column: "created_at", order: "asc" },
+        });
+        if (error || !data) return;
+
+        for (const item of data) {
+          if (toDelete.length >= maxItems) break;
+          const itemPath = folder ? `${folder}/${item.name}` : item.name;
+          if (item.id === null || !item.metadata) {
+            // Es un directorio
+            await scanFolder(itemPath);
+          } else {
+            // Es un archivo: verificar si es imagen
+            const isImage = itemPath.includes("/images/") ||
+                            itemPath.includes("/comprobantes/") ||
+                            /\.(jpg|jpeg|png|webp|heic|gif)$/i.test(item.name) ||
+                            (typeof item.metadata?.mimetype === "string" && item.metadata.mimetype.startsWith("image/"));
+            if (!isImage) continue;
+
+            const created = item.created_at ? new Date(item.created_at).getTime() : 0;
+            const updated = item.updated_at ? new Date(item.updated_at).getTime() : 0;
+            const fileTime = created || updated || 0;
+
+            if (fileTime > 0 && fileTime <= cutoffTime) {
+              toDelete.push(itemPath);
+            }
+          }
+        }
+      };
+
+      await scanFolder("");
+      filesFound += toDelete.length;
+
+      // Borrado en lotes de 100 archivos
+      for (let i = 0; i < toDelete.length; i += 100) {
+        const chunk = toDelete.slice(i, i + 100);
+        try {
+          const { error } = await storageBucket.remove(chunk);
+          if (!error) {
+            cleaned += chunk.length;
+          }
+        } catch {
+          // Continuar con siguientes lotes
+        }
+      }
+    }
+
+    return { cleaned, filesFound };
+  }
 }
 
 const mediaBucket = new SupabaseMediaBucket();
