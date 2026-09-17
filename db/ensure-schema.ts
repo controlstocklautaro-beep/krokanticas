@@ -85,5 +85,7 @@ export async function ensureSchema(): Promise<void> {
   await db.prepare("ALTER TABLE business_settings ADD COLUMN IF NOT EXISTS cash_discount_percentage REAL NOT NULL DEFAULT 10").run();
   await db.prepare("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS bot_paused_at BIGINT").run();
   await db.prepare("ALTER TABLE chats ADD COLUMN IF NOT EXISTS bot_paused_at BIGINT").run();
+  await db.prepare("CREATE TABLE IF NOT EXISTS storage_fallback (path TEXT PRIMARY KEY NOT NULL, contents BYTEA NOT NULL, content_type TEXT, created_at BIGINT NOT NULL)").run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS storage_fallback_created_idx ON storage_fallback (created_at)").run();
   schemaReady = true;
 }

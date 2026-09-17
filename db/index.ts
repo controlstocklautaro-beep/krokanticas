@@ -166,44 +166,115 @@ class SupabaseMediaBucket {
   private get bucket() { return supabaseAdmin().storage.from(this.bucketName); }
 
   async put(path: string, contents: ArrayBuffer, options: MediaPutOptions = {}) {
-    const { error } = await this.bucket.upload(path, new Uint8Array(contents), {
-      contentType: options.httpMetadata?.contentType ?? "application/octet-stream",
-      cacheControl: "3600",
-      upsert: false,
-    });
-    if (error) throw new Error(`No se pudo guardar el archivo: ${error.message}`);
+    let uploadFailed = false;
+    let uploadErrorMessage = "";
+    try {
+      const { error } = await this.bucket.upload(path, new Uint8Array(contents), {
+        contentType: options.httpMetadata?.contentType ?? "application/octet-stream",
+        cacheControl: "3600",
+        upsert: true,
+      });
+      if (error) {
+        uploadFailed = true;
+        uploadErrorMessage = error.message;
+      }
+    } catch (err: unknown) {
+      uploadFailed = true;
+      uploadErrorMessage = err instanceof Error ? err.message : String(err);
+    }
+
+    if (uploadFailed) {
+      console.warn(`[Storage Fallback] Supabase Storage restringido (${uploadErrorMessage}). Guardando en PostgreSQL fallback: ${path}`);
+      try {
+        const sql = getSql();
+        const buffer = Buffer.from(contents);
+        const contentType = options.httpMetadata?.contentType ?? "image/jpeg";
+        const now = Date.now();
+        await sql`
+          INSERT INTO storage_fallback (path, contents, content_type, created_at)
+          VALUES (${path}, ${buffer}, ${contentType}, ${now})
+          ON CONFLICT (path) DO UPDATE SET contents = EXCLUDED.contents, content_type = EXCLUDED.content_type, created_at = EXCLUDED.created_at
+        `;
+        return;
+      } catch {
+        throw new Error(`No se pudo guardar el archivo: ${uploadErrorMessage}`);
+      }
+    }
   }
 
   async get(path: string): Promise<SupabaseMediaObject | null> {
-    const { data, error } = await this.bucket.download(path);
-    if (error || !data) return null;
-    return new SupabaseMediaObject(data);
+    try {
+      const { data, error } = await this.bucket.download(path);
+      if (!error && data) return new SupabaseMediaObject(data);
+    } catch {
+      // Continuar al fallback
+    }
+
+    // Buscar en storage_fallback de PostgreSQL
+    try {
+      const sql = getSql();
+      const rows = await sql`
+        SELECT contents, content_type FROM storage_fallback WHERE path = ${path} LIMIT 1
+      `;
+      if (rows && rows.length > 0) {
+        const row = rows[0];
+        const blob = new Blob([row.contents as any], { type: (row.content_type as string) || "application/octet-stream" });
+        return new SupabaseMediaObject(blob);
+      }
+    } catch {}
+
+    return null;
   }
 
   async signedUrl(path: string, expiresIn = 60 * 60): Promise<string> {
-    const { data, error } = await this.bucket.createSignedUrl(path, expiresIn);
-    if (error || !data?.signedUrl) throw new Error(`No se pudo generar el enlace del archivo: ${error?.message ?? "sin URL"}`);
-    return data.signedUrl;
+    try {
+      const { data, error } = await this.bucket.createSignedUrl(path, expiresIn);
+      if (!error && data?.signedUrl) return data.signedUrl;
+    } catch {
+      // Continuar al fallback
+    }
+    const baseUrl = process.env.APP_BASE_URL || "";
+    const encoded = path.split("/").map(encodeURIComponent).join("/");
+    return `${baseUrl}/api/media/${encoded}`;
   }
 
   async head(path: string): Promise<{ key: string } | null> {
-    const separator = path.lastIndexOf("/");
-    const folder = separator >= 0 ? path.slice(0, separator) : "";
-    const filename = separator >= 0 ? path.slice(separator + 1) : path;
-    const { data, error } = await this.bucket.list(folder, { search: filename, limit: 100 });
-    if (error) throw new Error(`No se pudo consultar el archivo: ${error.message}`);
-    return data?.some((entry) => entry.name === filename) ? { key: path } : null;
+    try {
+      const separator = path.lastIndexOf("/");
+      const folder = separator >= 0 ? path.slice(0, separator) : "";
+      const filename = separator >= 0 ? path.slice(separator + 1) : path;
+      const { data, error } = await this.bucket.list(folder, { search: filename, limit: 100 });
+      if (!error && data?.some((entry) => entry.name === filename)) {
+        return { key: path };
+      }
+    } catch {}
+
+    try {
+      const sql = getSql();
+      const rows = await sql`SELECT 1 FROM storage_fallback WHERE path = ${path} LIMIT 1`;
+      if (rows && rows.length > 0) return { key: path };
+    } catch {}
+
+    return null;
   }
 
   async delete(path: string): Promise<void> {
-    const { error } = await this.bucket.remove([path]);
-    if (error) throw new Error(`No se pudo eliminar el archivo: ${error.message}`);
+    try {
+      await this.bucket.remove([path]);
+    } catch {}
+    try {
+      await getSql()`DELETE FROM storage_fallback WHERE path = ${path}`;
+    } catch {}
   }
 
   async deleteMany(paths: string[]): Promise<void> {
     if (!paths.length) return;
-    const { error } = await this.bucket.remove(paths);
-    if (error) throw new Error(`No se pudieron eliminar los archivos: ${error.message}`);
+    try {
+      await this.bucket.remove(paths);
+    } catch {}
+    try {
+      await getSql()`DELETE FROM storage_fallback WHERE path IN ${getSql()(paths)}`;
+    } catch {}
   }
 
   async scanAndCleanExpiredImages(cutoffTime: number, maxItems = 5000): Promise<{ cleaned: number; filesFound: number }> {
@@ -278,6 +349,12 @@ class SupabaseMediaBucket {
         }
       }
     }
+
+    // Limpiar también registros vencidos del fallback en PostgreSQL
+    try {
+      const deletedFallback = await getSql()`DELETE FROM storage_fallback WHERE created_at <= ${cutoffTime}`;
+      cleaned += (deletedFallback as unknown as { count?: number }).count || 0;
+    } catch {}
 
     return { cleaned, filesFound };
   }
