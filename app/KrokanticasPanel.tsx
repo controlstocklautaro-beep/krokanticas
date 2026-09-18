@@ -284,10 +284,11 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
     let activeSync = true;
 
     async function checkRealtimeUpdates() {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const [ordersRes, handoffsRes] = await Promise.all([
-          api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${encodeURIComponent(business.id)}`).catch(() => null),
-          api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${encodeURIComponent(business.id)}`).catch(() => null),
+          api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${encodeURIComponent(business.id)}&status=active`).catch(() => null),
+          api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${encodeURIComponent(business.id)}&status=active`).catch(() => null),
         ]);
 
         if (!activeSync) return;
@@ -399,14 +400,22 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
 
     void checkRealtimeUpdates();
 
-    // Sincronización continua cada 2.5 segundos
+    // Sincronización continua cada 6 segundos cuando la pestaña está visible
     const timer = setInterval(() => {
       void checkRealtimeUpdates();
-    }, 2500);
+    }, 6000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void checkRealtimeUpdates();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       activeSync = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [business.id]);
 
@@ -495,32 +504,38 @@ function Overview({ businessId, onNavigate }: { businessId: string; onNavigate: 
   async function reload() {
     const [settingsData, orderData, productData, contactData, handoffData] = await Promise.all([
       api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`),
-      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&status=active`),
       api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
       api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
-      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`),
+      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}&status=active`),
     ]);
     setSettings(settingsData.settings); setOrders(orderData.orders); setProducts(productData.products); setContacts(contactData.contacts); setHandoffs(handoffData.handoffs);
   }
 
   useEffect(() => {
     let active = true;
-    const fetchAll = () => Promise.all([
-      api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`),
-      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
-      api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
-      api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
-      api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}`),
-    ]).then(([settingsData, orderData, productData, contactData, handoffData]) => {
-      if (!active) return;
-      setSettings(settingsData.settings); setOrders(orderData.orders); setProducts(productData.products); setContacts(contactData.contacts); setHandoffs(handoffData.handoffs);
-    }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    const fetchAll = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      Promise.all([
+        api<{ settings: Settings }>(`/api/settings?businessId=${businessId}`),
+        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&status=active`),
+        api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
+        api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
+        api<{ handoffs: Handoff[] }>(`/api/handoffs?businessId=${businessId}&status=active`),
+      ]).then(([settingsData, orderData, productData, contactData, handoffData]) => {
+        if (!active) return;
+        setSettings(settingsData.settings); setOrders(orderData.orders); setProducts(productData.products); setContacts(contactData.contacts); setHandoffs(handoffData.handoffs);
+      }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    };
 
     void fetchAll();
-    const timer = setInterval(fetchAll, 3000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") fetchAll();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
-      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [businessId]);
 
@@ -1248,12 +1263,27 @@ function KitchenModule({ businessId }: { businessId: string }) {
         })
         .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
 
+    const pollOrders = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`)
+        .then((orderData) => {
+          if (!active) return;
+          setOrders(orderData.orders);
+        })
+        .catch(() => undefined);
+    };
+
     void fetchAll();
-    // Actualización automática en tiempo real cada 2.5 segundos
-    const timer = setInterval(fetchAll, 2500);
+    // Actualización automática cada 8 segundos solo cuando la pestaña está visible
+    const timer = setInterval(pollOrders, 8000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") pollOrders();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [businessId]);
 

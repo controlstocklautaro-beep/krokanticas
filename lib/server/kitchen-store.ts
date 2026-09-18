@@ -101,7 +101,14 @@ function areItemsEqual(
   return true;
 }
 
-export async function consolidateDuplicateOrders(businessId: string) {
+const lastConsolidationByBusiness = new Map<string, number>();
+
+export async function consolidateDuplicateOrders(businessId: string, force = false) {
+  if (!force) {
+    const last = lastConsolidationByBusiness.get(businessId) || 0;
+    if (Date.now() - last < 60_000) return;
+    lastConsolidationByBusiness.set(businessId, Date.now());
+  }
   const db = getD1();
   const now = Date.now();
   const activeOrdersRes = await db.prepare(`
@@ -114,7 +121,11 @@ export async function consolidateDuplicateOrders(businessId: string) {
   const orders = activeOrdersRes.results;
   if (orders.length < 2) return;
 
-  const allItemsRes = await db.prepare("SELECT id, order_id, product_id, product_name, quantity FROM order_items WHERE business_id = ?").bind(businessId).all<{ id: string; order_id: string; product_id: string; product_name: string; quantity: number }>();
+  const orderIds = orders.map((o) => o.id as string);
+  const placeholders = orderIds.map(() => "?").join(", ");
+  const allItemsRes = await db.prepare(
+    `SELECT id, order_id, product_id, product_name, quantity FROM order_items WHERE business_id = ? AND order_id IN (${placeholders})`
+  ).bind(businessId, ...orderIds).all<{ id: string; order_id: string; product_id: string; product_name: string; quantity: number }>();
   const itemsByOrder = new Map<string, typeof allItemsRes.results>();
   for (const item of allItemsRes.results) {
     const list = itemsByOrder.get(item.order_id) || [];
@@ -167,12 +178,30 @@ export async function consolidateDuplicateOrders(businessId: string) {
 export async function listKitchenOrders(businessId: string, status?: string | null) {
   await consolidateDuplicateOrders(businessId).catch(() => undefined);
   const db = getD1();
-  const filter = status && status !== "all" ? " AND status = ?" : "";
+  let filter = "";
+  const params: unknown[] = [businessId];
+  if (status === "active") {
+    filter = " AND status NOT IN ('delivered', 'cancelled')";
+  } else if (status && status !== "all") {
+    filter = " AND status = ?";
+    params.push(status);
+  }
   const query = `SELECT id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at FROM orders WHERE business_id = ?${filter} ORDER BY created_at DESC`;
-  const orders = status && status !== "all" ? await db.prepare(query).bind(businessId, status).all<Record<string, unknown>>() : await db.prepare(query).bind(businessId).all<Record<string, unknown>>();
+  const orders = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
   if (!orders.results.length) return [];
-  const items = await db.prepare("SELECT id, order_id, product_id, product_name, quantity, unit_price, subtotal FROM order_items WHERE business_id = ? ORDER BY product_name").bind(businessId).all<Record<string, unknown>>();
-  return orders.results.map((order) => ({ ...order, items: items.results.filter((item) => item.order_id === order.id) }));
+
+  const orderIds = orders.results.map((o) => o.id as string);
+  const chunkSize = 100;
+  const items: Record<string, unknown>[] = [];
+  for (let i = 0; i < orderIds.length; i += chunkSize) {
+    const chunk = orderIds.slice(i, i + chunkSize);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const chunkRes = await db.prepare(
+      `SELECT id, order_id, product_id, product_name, quantity, unit_price, subtotal FROM order_items WHERE business_id = ? AND order_id IN (${placeholders}) ORDER BY product_name`
+    ).bind(businessId, ...chunk).all<Record<string, unknown>>();
+    items.push(...chunkRes.results);
+  }
+  return orders.results.map((order) => ({ ...order, items: items.filter((item) => item.order_id === order.id) }));
 }
 
 const RECEIPT_KEYS = [
@@ -569,6 +598,7 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
   }
 
   await db.batch(statements);
+  await consolidateDuplicateOrders(businessId, true).catch(() => undefined);
   return {
     id: orderId,
     orderNumber,

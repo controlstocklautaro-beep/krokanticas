@@ -12,8 +12,16 @@ export async function GET(req: Request) {
     const businessId = businessIdFrom(req);
     await requireBusinessAccess(req, businessId, { allowIntegration: true });
     const status = new URL(req.url).searchParams.get("status");
-    const sql = `SELECT id, contact_id, order_id, phone_number, customer_name, reason, summary, priority, status, assigned_to, created_at, updated_at, resolved_at FROM handoffs WHERE business_id = ?${status && status !== "all" ? " AND status = ?" : ""} ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, created_at DESC`;
-    const result = status && status !== "all" ? await getD1().prepare(sql).bind(businessId, status).all() : await getD1().prepare(sql).bind(businessId).all();
+    let filter = "";
+    const params: unknown[] = [businessId];
+    if (status === "active" || status === "unresolved") {
+      filter = " AND status IN ('open', 'in_progress')";
+    } else if (status && status !== "all") {
+      filter = " AND status = ?";
+      params.push(status);
+    }
+    const sql = `SELECT id, contact_id, order_id, phone_number, customer_name, reason, summary, priority, status, assigned_to, created_at, updated_at, resolved_at FROM handoffs WHERE business_id = ?${filter} ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, created_at DESC`;
+    const result = await getD1().prepare(sql).bind(...params).all();
     return NextResponse.json({ handoffs: result.results });
   } catch (error) { return apiErrorResponse(error, "Error consultando derivaciones"); }
 }

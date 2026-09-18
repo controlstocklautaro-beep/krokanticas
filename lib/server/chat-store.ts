@@ -11,7 +11,14 @@ export type StoredChat = {
 export const WHATSAPP_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const BOT_PAUSE_DURATION_MS = 60 * 60 * 1000; // 1 hora de pausa antes de reactivar automáticamente
 
+const lastReactivateByBusiness = new Map<string, number>();
+
 export async function autoReactivateExpiredBots(businessId: string, phoneNumber?: string) {
+  if (!phoneNumber) {
+    const last = lastReactivateByBusiness.get(businessId) || 0;
+    if (Date.now() - last < 60_000) return;
+    lastReactivateByBusiness.set(businessId, Date.now());
+  }
   const db = getD1();
   const threshold = Date.now() - BOT_PAUSE_DURATION_MS;
   const now = Date.now();

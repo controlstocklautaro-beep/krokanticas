@@ -143,33 +143,55 @@ export function MessagesModule({ businessId }: { businessId: string }) {
 
   useEffect(() => {
     let active = true;
-    const refresh = () => Promise.all([
-      api<{ chats: ChatRecord[] }>(`/api/chats?businessId=${encodeURIComponent(businessId)}`),
-      api<{ tags: TagRecord[] }>(`/api/tags?businessId=${encodeURIComponent(businessId)}`),
-    ]).then(([chatData, tagData]) => {
-      if (!active) return;
-      setChats(chatData.chats);
-      setTags(tagData.tags);
-      setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
-    }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    const refresh = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      Promise.all([
+        api<{ chats: ChatRecord[] }>(`/api/chats?businessId=${encodeURIComponent(businessId)}`),
+        api<{ tags: TagRecord[] }>(`/api/tags?businessId=${encodeURIComponent(businessId)}`),
+      ]).then(([chatData, tagData]) => {
+        if (!active) return;
+        setChats(chatData.chats);
+        setTags(tagData.tags);
+        setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
+      }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    };
     void refresh();
-    const timer = window.setInterval(refresh, 2_500);
-    return () => { active = false; window.clearInterval(timer); };
+    const timer = window.setInterval(refresh, 6_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [businessId]);
 
   useEffect(() => {
     if (!selectedPhone) return;
     let active = true;
-    const refresh = () => api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(selectedPhone)}`)
-      .then((data) => {
-        if (!active) return;
-        setMessages(data.messages);
-        setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
-      })
-      .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar mensajes"));
+    const refresh = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(selectedPhone)}`)
+        .then((data) => {
+          if (!active) return;
+          setMessages(data.messages);
+          setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
+        })
+        .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar mensajes"));
+    };
     void refresh();
-    const timer = window.setInterval(refresh, 2_000);
-    return () => { active = false; window.clearInterval(timer); };
+    const timer = window.setInterval(refresh, 4_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [businessId, selectedPhone]);
 
   useEffect(() => {
