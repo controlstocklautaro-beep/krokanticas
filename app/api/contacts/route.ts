@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getD1 } from "@/db";
 import { ApiError, apiErrorResponse, businessIdFrom, normalizePhone } from "@/lib/server/api-utils";
 import { requireBusinessAccess } from "@/lib/server/business-context";
-import { autoReactivateExpiredBots } from "@/lib/server/chat-store";
+import { autoReactivateExpiredBots, findExistingContact } from "@/lib/server/chat-store";
 
 export async function GET(req: Request) {
   try {
@@ -10,19 +10,25 @@ export async function GET(req: Request) {
     await requireBusinessAccess(req, businessId, { allowIntegration: true });
     await autoReactivateExpiredBots(businessId);
     const rawPhone = new URL(req.url).searchParams.get("phone_number");
-    const phoneNumber = rawPhone ? normalizePhone(rawPhone) : null;
-    const result = phoneNumber ? await getD1().prepare(`
-      SELECT id, phone_number, name, email, address, notes, agent_active, bot_paused_at, created_at, updated_at
-      FROM contacts WHERE business_id = ? AND phone_number = ? ORDER BY created_at DESC
-    `).bind(businessId, phoneNumber).all<Record<string, unknown>>() : await getD1().prepare(`
-      SELECT id, phone_number, name, email, address, notes, agent_active, bot_paused_at, created_at, updated_at
-      FROM contacts WHERE business_id = ? ORDER BY created_at DESC
-    `).bind(businessId).all<Record<string, unknown>>();
-    const contacts = result.results.map((contact) => ({
-      ...contact,
-      agent_active: Boolean(contact.agent_active),
-      bot_paused_at: contact.bot_paused_at ? Number(contact.bot_paused_at) : null,
-    }));
+    let contacts: unknown[] = [];
+    if (rawPhone) {
+      const found = await findExistingContact(businessId, rawPhone);
+      contacts = found ? [{
+        ...found,
+        agent_active: Boolean(found.agent_active),
+        bot_paused_at: found.bot_paused_at ? Number(found.bot_paused_at) : null,
+      }] : [];
+    } else {
+      const result = await getD1().prepare(`
+        SELECT id, phone_number, name, email, address, notes, agent_active, bot_paused_at, created_at, updated_at
+        FROM contacts WHERE business_id = ? ORDER BY created_at DESC
+      `).bind(businessId).all<Record<string, unknown>>();
+      contacts = result.results.map((contact) => ({
+        ...contact,
+        agent_active: Boolean(contact.agent_active),
+        bot_paused_at: contact.bot_paused_at ? Number(contact.bot_paused_at) : null,
+      }));
+    }
     return NextResponse.json({ contacts });
   } catch (error) {
     return apiErrorResponse(error, "Error listando contactos");
@@ -46,15 +52,14 @@ export async function POST(req: Request) {
     if (!name) throw new ApiError("Falta name", 400);
     const phoneNumber = normalizePhone(body.phone_number);
     const db = getD1();
-    const existing = await db.prepare("SELECT id, name FROM contacts WHERE business_id = ? AND phone_number = ?")
-      .bind(businessId, phoneNumber).first<{ id: string; name: string }>();
+    const existing = await findExistingContact(businessId, phoneNumber);
 
     const now = Date.now();
     const active = body.agent_active !== false ? 1 : 0;
     const botPausedAt = active ? null : now;
 
     if (existing) {
-      // Si el contacto ya existe, conservamos su nombre para que llamadas de API/n8n no pisen el nombre real
+      // Si el contacto ya existe, conservamos estrictamente su nombre real agendado. Ninguna API o mensaje puede pisar el nombre.
       await db.batch([
         db.prepare(`
           UPDATE contacts SET
@@ -129,16 +134,15 @@ export async function PATCH(req: Request) {
     const current = contactId
       ? await db.prepare("SELECT id, phone_number, name, email, address, notes, agent_active, bot_paused_at FROM contacts WHERE id = ? AND business_id = ?")
           .bind(contactId, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null; agent_active: number; bot_paused_at: number | null }>()
-      : await db.prepare("SELECT id, phone_number, name, email, address, notes, agent_active, bot_paused_at FROM contacts WHERE phone_number = ? AND business_id = ?")
-          .bind(normalizedLookupPhone, businessId).first<{ id: string; phone_number: string; name: string; email: string | null; address: string | null; notes: string | null; agent_active: number; bot_paused_at: number | null }>();
+      : await findExistingContact(businessId, normalizedLookupPhone!);
 
     if (!current) throw new ApiError("Contacto no encontrado", 404);
 
     const targetPhone = normalizedLookupPhone || current.phone_number;
-    const isIntegration = access.role === "integration";
+    // Las integraciones y llamadas vía API NO pueden modificar el nombre de un contacto agendado; sólo un usuario humano autenticado desde el panel puede editarlo manualmente.
+    const isManualPanelUser = Boolean(access.userId && access.role !== "integration");
     const rawName = body.name ?? body.customerName ?? body.customer_name;
-    // Las integraciones/API no pueden pisar el nombre de un contacto existente; sólo los usuarios desde el panel pueden modificarlo
-    const name = (!isIntegration && rawName !== undefined && rawName.trim()) ? rawName.trim() : current.name;
+    const name = (isManualPanelUser && rawName !== undefined && rawName.trim()) ? rawName.trim() : current.name;
     const rawAddress = body.address ?? body.direccion;
     const address = rawAddress !== undefined ? (rawAddress.trim() || null) : current.address;
     const rawNotes = body.notes ?? body.notas;

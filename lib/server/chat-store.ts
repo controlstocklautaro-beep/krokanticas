@@ -1,4 +1,5 @@
 import { getD1 } from "@/db";
+import { normalizePhone } from "@/lib/server/api-utils";
 
 export type StoredChat = {
   phone_number: string;
@@ -6,6 +7,17 @@ export type StoredChat = {
   agent_active: number;
   bot_paused_at?: number | null;
   updated_at: number;
+};
+
+export type StoredContact = {
+  id: string;
+  name: string;
+  phone_number: string;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  agent_active: number;
+  bot_paused_at: number | null;
 };
 
 export const WHATSAPP_REPLY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -74,12 +86,47 @@ export async function getChat(businessId: string, phoneNumber: string) {
     .bind(businessId, phoneNumber).first<StoredChat>();
 }
 
+export async function findExistingContact(businessId: string, rawPhone: string): Promise<StoredContact | null> {
+  const db = getD1();
+  let normalized = rawPhone;
+  try {
+    normalized = normalizePhone(rawPhone);
+  } catch {
+    // Mantener rawPhone si no pudo normalizarse
+  }
+
+  // 1. Coincidencia exacta con teléfono normalizado
+  let contact = await db.prepare("SELECT id, name, phone_number, email, address, notes, agent_active, bot_paused_at FROM contacts WHERE business_id = ? AND phone_number = ?")
+    .bind(businessId, normalized).first<StoredContact>();
+  if (contact) return contact;
+
+  // 2. Coincidencia flexible por los últimos 8-10 dígitos para contemplar contactos cargados con formato local
+  const digits = normalized.replace(/\D/g, "");
+  if (digits.length >= 8) {
+    const suffix = digits.slice(-8);
+    const candidates = await db.prepare("SELECT id, name, phone_number, email, address, notes, agent_active, bot_paused_at FROM contacts WHERE business_id = ? AND (phone_number = ? OR phone_number LIKE ?)")
+      .bind(businessId, rawPhone, `%${suffix}`).all<StoredContact>();
+    if (candidates.results.length > 0) {
+      contact = candidates.results[0];
+      // Si el contacto en la BD tenía un formato antiguo (ej. sin +549), actualizar su teléfono para que en el futuro coincida de inmediato
+      if (contact.phone_number !== normalized) {
+        await db.prepare("UPDATE contacts SET phone_number = ?, updated_at = ? WHERE id = ? AND business_id = ?")
+          .bind(normalized, Date.now(), contact.id, businessId).run().catch(() => undefined);
+      }
+      return contact;
+    }
+  }
+  return null;
+}
+
 export async function upsertChat(businessId: string, phoneNumber: string, userName: string, timestamp = Date.now()) {
   const db = getD1();
-  const contact = await db.prepare("SELECT name FROM contacts WHERE business_id = ? AND phone_number = ?")
-    .bind(businessId, phoneNumber).first<{ name: string }>();
+  const contact = await findExistingContact(businessId, phoneNumber);
   const chat = await db.prepare("SELECT user_name FROM chats WHERE business_id = ? AND phone_number = ?")
     .bind(businessId, phoneNumber).first<{ user_name: string }>();
+  // Prioridad 1: Nombre agendado en contactos (el nombre real que puso Mati).
+  // Prioridad 2: Nombre ya establecido en el chat (si no está agendado pero ya tenía un nombre previo).
+  // Prioridad 3: Apodo recibido (userName).
   const establishedName = contact?.name?.trim() || chat?.user_name?.trim() || userName;
 
   await db.prepare(`
@@ -93,8 +140,7 @@ export async function upsertChat(businessId: string, phoneNumber: string, userNa
 
 export async function ensureContact(businessId: string, phoneNumber: string, requestedName?: string) {
   const db = getD1();
-  const existing = await db.prepare("SELECT id, name FROM contacts WHERE business_id = ? AND phone_number = ?")
-    .bind(businessId, phoneNumber).first<{ id: string; name: string }>();
+  const existing = await findExistingContact(businessId, phoneNumber);
   if (existing) return existing;
   const existingChat = await db.prepare("SELECT user_name FROM chats WHERE business_id = ? AND phone_number = ?")
     .bind(businessId, phoneNumber).first<{ user_name: string }>();

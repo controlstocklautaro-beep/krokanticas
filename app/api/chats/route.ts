@@ -16,7 +16,7 @@ export async function GET(req: Request) {
         (SELECT m.sender FROM messages m WHERE m.business_id = c.business_id AND m.phone_number = c.phone_number ORDER BY m.created_at DESC LIMIT 1) AS last_sender,
         (SELECT m.created_at FROM messages m WHERE m.business_id = c.business_id AND m.phone_number = c.phone_number ORDER BY m.created_at DESC LIMIT 1) AS last_message_at
       FROM chats c
-      LEFT JOIN contacts ct ON ct.business_id = c.business_id AND ct.phone_number = c.phone_number
+      LEFT JOIN contacts ct ON ct.business_id = c.business_id AND (ct.phone_number = c.phone_number OR (LENGTH(ct.phone_number) >= 8 AND LENGTH(c.phone_number) >= 8 AND RIGHT(ct.phone_number, 8) = RIGHT(c.phone_number, 8)))
       LEFT JOIN chat_tags t ON t.business_id = c.business_id AND t.phone_number = c.phone_number
       WHERE c.business_id = ?
       GROUP BY c.id, c.phone_number, c.user_name, ct.name, c.agent_active, c.bot_paused_at, c.updated_at, c.business_id

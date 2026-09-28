@@ -5,15 +5,18 @@ import Image from "next/image";
 import {
   ArrowLeft,
   Bot,
+  Check,
   ExternalLink,
   MessageCircle,
   Paperclip,
+  Pencil,
   Search,
   Send,
   Tag,
   Tags,
   Trash2,
   UserRound,
+  X,
   Zap,
 } from "lucide-react";
 import { PaginationControls } from "./PaginationControls";
@@ -111,6 +114,29 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const messagesBodyRef = useRef<HTMLDivElement>(null);
   const [replyWindow, setReplyWindow] = useState<ReplyWindow>({ checked: false, canReply: false, lastInboundAt: null });
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+
+  async function saveContactName(e: FormEvent) {
+    e.preventDefault();
+    if (!selectedChat || !nameInput.trim()) return;
+    try {
+      await api("/api/contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessId,
+          phone_number: selectedChat.phone_number,
+          name: nameInput.trim(),
+        }),
+      });
+      const updatedName = nameInput.trim();
+      setChats((current) => current.map((c) => c.phone_number === selectedChat.phone_number ? { ...c, user_name: updatedName } : c));
+      setEditingName(false);
+    } catch (saveError) {
+      alert(saveError instanceof Error ? saveError.message : "No se pudo actualizar el nombre");
+    }
+  }
 
   const QUICK_REPLIES = [
     "¡Hola! ¿Cómo estás? Te dejamos nuestra carta de empanadas.",
@@ -195,6 +221,7 @@ export function MessagesModule({ businessId }: { businessId: string }) {
   }, [businessId, selectedPhone]);
 
   useEffect(() => {
+    setEditingName(false);
     const body = messagesBodyRef.current;
     if (body) body.scrollTop = body.scrollHeight;
   }, [selectedPhone, messages.length]);
@@ -609,7 +636,42 @@ export function MessagesModule({ businessId }: { businessId: string }) {
               </div>
               <div className="k-wa-header-info">
                 <div className="k-wa-header-name-row">
-                  <strong>{selectedChat.user_name}</strong>
+                  {editingName ? (
+                    <form onSubmit={saveContactName} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <input
+                        type="text"
+                        value={nameInput}
+                        onChange={(e) => setNameInput(e.target.value)}
+                        autoFocus
+                        style={{
+                          padding: "2px 8px",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          borderRadius: "4px",
+                          border: "1px solid #1e805f",
+                          outline: "none",
+                        }}
+                      />
+                      <button type="submit" title="Guardar nombre" style={{ background: "none", border: "none", cursor: "pointer", color: "#1e805f", display: "flex", alignItems: "center", padding: "2px" }}>
+                        <Check size={16} />
+                      </button>
+                      <button type="button" onClick={() => setEditingName(false)} title="Cancelar" style={{ background: "none", border: "none", cursor: "pointer", color: "#888", display: "flex", alignItems: "center", padding: "2px" }}>
+                        <X size={16} />
+                      </button>
+                    </form>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <strong>{selectedChat.user_name}</strong>
+                      <button
+                        type="button"
+                        onClick={() => { setNameInput(selectedChat.user_name); setEditingName(true); }}
+                        title="Editar nombre del contacto (no será sobreescrito por WhatsApp)"
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", opacity: 0.6, display: "flex", alignItems: "center", padding: "2px" }}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                  )}
                   <span className="k-wa-phone">{selectedChat.phone_number}</span>
                 </div>
                 <div className="k-wa-header-status">

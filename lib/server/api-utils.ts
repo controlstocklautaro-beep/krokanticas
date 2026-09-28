@@ -8,9 +8,22 @@ export class ApiError extends Error {
 
 export function normalizePhone(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) throw new ApiError("Falta phone_number", 400);
-  const normalized = value.trim().replace(/^\+/, "").replace(/[\s()-]/g, "");
-  if (!/^\d{6,18}$/.test(normalized)) throw new ApiError("phone_number inválido", 400);
-  return `+${normalized}`;
+  let digits = value.trim().replace(/\D/g, "");
+  if (!digits || digits.length < 6 || digits.length > 18) throw new ApiError("phone_number inválido", 400);
+
+  // Normalización para teléfonos de Argentina para asegurar coincidencia con WhatsApp Cloud API (+549...):
+  if (digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+  if (digits.startsWith("54") && !digits.startsWith("549") && digits.length === 12) {
+    digits = `549${digits.slice(2)}`;
+  } else if (digits.length === 10) {
+    digits = `549${digits}`;
+  } else if (digits.length === 12 && digits.startsWith("1115")) {
+    digits = `54911${digits.slice(4)}`;
+  }
+
+  return `+${digits}`;
 }
 
 export function normalizeBusinessId(value: unknown): string {
