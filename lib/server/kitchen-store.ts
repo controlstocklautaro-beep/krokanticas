@@ -443,8 +443,9 @@ export async function createKitchenOrder(businessId: string, rawBody: OrderInput
     throw new ApiError("Falta la dirección de entrega para el pedido con envío", 400);
   }
 
-  // Actualizar dirección del contacto si vino en la orden
-  if (contactId && rawAddress && (!contactAddress || rawAddress !== contactAddress)) {
+  // Actualizar dirección del contacto solo con la dirección de ENTREGA de un pedido con envío.
+  // En un retiro la "dirección" suele ser la del local y quedaba grabada como si fuera la del cliente.
+  if (contactId && deliveryType === "delivery" && rawAddress && (!contactAddress || rawAddress !== contactAddress)) {
     await db.prepare("UPDATE contacts SET address = ?, updated_at = ? WHERE id = ? AND business_id = ?")
       .bind(rawAddress, now, contactId, businessId).run();
   }
