@@ -65,7 +65,9 @@ function formatSettings(row: Record<string, unknown> | null) {
 
   const scheduleLunch = String(row?.schedule_lunch || DEFAULT_SETTINGS.scheduleLunch);
   const scheduleDinner = String(row?.schedule_dinner || DEFAULT_SETTINGS.scheduleDinner);
-  const scheduleNotes = String(row?.schedule_notes || `Mediodía: ${scheduleLunch} · Noche: ${scheduleDinner}`);
+  // El resumen se arma siempre desde los dos horarios: el panel solo edita mediodía y noche,
+  // y un schedule_notes guardado quedaba desactualizado (el bot informaba horarios viejos).
+  const scheduleNotes = `Mediodía: ${scheduleLunch} · Noche: ${scheduleDinner}`;
 
   const cashDiscountEnabled = Boolean(Number(row?.cash_discount_enabled ?? (DEFAULT_SETTINGS.cashDiscountEnabled ? 1 : 0)));
   const cashDiscountPercentage = Number(row?.cash_discount_percentage ?? DEFAULT_SETTINGS.cashDiscountPercentage);
