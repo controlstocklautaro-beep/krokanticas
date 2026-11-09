@@ -175,7 +175,12 @@ export async function consolidateDuplicateOrders(businessId: string, force = fal
   }
 }
 
-export async function listKitchenOrders(businessId: string, status?: string | null) {
+// Ventana por defecto del listado: solo pedidos recientes. El historial completo pesaba 2 MB y tardaba
+// un minuto por llamada, y el panel lo pedía cada 8 segundos (eso agotó la cuota de Vercel). Los flujos
+// de n8n miran como mucho 24 h hacia atrás; el panel pide 7 días; `days=all` devuelve todo.
+export const DEFAULT_ORDER_WINDOW_DAYS = 2;
+
+export async function listKitchenOrders(businessId: string, status?: string | null, days: number | "all" = DEFAULT_ORDER_WINDOW_DAYS) {
   await consolidateDuplicateOrders(businessId).catch(() => undefined);
   const db = getD1();
   let filter = "";
@@ -185,6 +190,10 @@ export async function listKitchenOrders(businessId: string, status?: string | nu
   } else if (status && status !== "all") {
     filter = " AND status = ?";
     params.push(status);
+  }
+  if (days !== "all") {
+    filter += " AND created_at >= ?";
+    params.push(Date.now() - days * 24 * 60 * 60 * 1000);
   }
   const query = `SELECT id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at FROM orders WHERE business_id = ?${filter} ORDER BY created_at DESC`;
   const orders = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
@@ -201,7 +210,13 @@ export async function listKitchenOrders(businessId: string, status?: string | nu
     ).bind(businessId, ...chunk).all<Record<string, unknown>>();
     items.push(...chunkRes.results);
   }
-  return orders.results.map((order) => ({ ...order, items: items.filter((item) => item.order_id === order.id) }));
+  const itemsByOrder = new Map<string, Record<string, unknown>[]>();
+  for (const item of items) {
+    const list = itemsByOrder.get(item.order_id as string) || [];
+    list.push(item);
+    itemsByOrder.set(item.order_id as string, list);
+  }
+  return orders.results.map((order) => ({ ...order, items: itemsByOrder.get(order.id as string) || [] }));
 }
 
 const RECEIPT_KEYS = [

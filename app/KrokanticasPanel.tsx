@@ -47,6 +47,10 @@ import {
 } from "@/lib/client/sound-and-notifications";
 
 type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "finances" | "settings" | "users";
+
+// Comandas: el panel solo trae los últimos días (el historial completo pesaba 2 MB por refresco).
+const KITCHEN_HISTORY_DAYS = 7;
+const KITCHEN_POLL_MS = 20_000;
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Business = { id: string; name: string; modules: string[] };
 type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null; made_to_order: boolean; requires_human?: boolean };
@@ -1235,7 +1239,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
   async function reload() {
     try {
       const [orderData, contactData, productData] = await Promise.all([
-        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&days=${KITCHEN_HISTORY_DAYS}`),
         api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
         api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
       ]);
@@ -1251,7 +1255,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
     let active = true;
     const fetchAll = () =>
       Promise.all([
-        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`),
+        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&days=${KITCHEN_HISTORY_DAYS}`),
         api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
         api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
       ])
@@ -1265,7 +1269,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
 
     const pollOrders = () => {
       if (typeof document !== "undefined" && document.hidden) return;
-      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}`)
+      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&days=${KITCHEN_HISTORY_DAYS}`)
         .then((orderData) => {
           if (!active) return;
           setOrders(orderData.orders);
@@ -1274,8 +1278,9 @@ function KitchenModule({ businessId }: { businessId: string }) {
     };
 
     void fetchAll();
-    // Actualización automática cada 8 segundos solo cuando la pestaña está visible
-    const timer = setInterval(pollOrders, 8000);
+    // Actualización automática cada 20 segundos solo cuando la pestaña está visible
+    // (antes era cada 8 s con el historial completo: agotaba la transferencia de Vercel)
+    const timer = setInterval(pollOrders, KITCHEN_POLL_MS);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") pollOrders();
     };
