@@ -405,10 +405,10 @@ export function KrokanticasPanel({ user, business }: { user: { id: string; displ
 
     void checkRealtimeUpdates();
 
-    // Sincronización continua cada 6 segundos cuando la pestaña está visible
+    // Sincronización continua cada 10 segundos cuando la pestaña está visible
     const timer = setInterval(() => {
       void checkRealtimeUpdates();
-    }, 6000);
+    }, 10_000);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {

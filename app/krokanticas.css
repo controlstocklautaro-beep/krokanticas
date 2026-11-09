@@ -2593,3 +2593,6 @@
   }
 }
 
+.k-wa-load-more { display:block; width:calc(100% - 24px); margin:10px 12px 16px; padding:10px; border:1px dashed var(--k-line, #d8d2c8); border-radius:10px; background:transparent; color:inherit; font:inherit; font-size:13px; opacity:.75; cursor:pointer; }
+.k-wa-load-more:hover:not(:disabled) { opacity:1; }
+.k-wa-load-more:disabled { cursor:default; }

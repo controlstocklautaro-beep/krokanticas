@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, Fragment, UIEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -20,6 +20,12 @@ import {
   Zap,
 } from "lucide-react";
 import { PaginationControls } from "./PaginationControls";
+
+// Mensajes: cuánto se pide y cada cuánto (antes: 1.000 chats cada 6 s y la conversación entera cada 4 s).
+const CHAT_PAGE_SIZE = 60;
+const CHAT_POLL_MS = 10_000;
+const MESSAGES_PAGE_SIZE = 200;
+const MESSAGES_POLL_MS = 5_000;
 
 type ChatRecord = {
   phone_number: string;
@@ -151,38 +157,126 @@ export function MessagesModule({ businessId }: { businessId: string }) {
     "#25D366", "#5477ef", "#ed6a2c", "#e4a140", "#8a60d0", "#e04040", "#00a884", "#35a47b"
   ];
 
+  // La lista de chats se carga de a páginas (a medida que se scrollea) y el refresco en vivo pide solo lo que
+  // cambió desde la última vez. Antes se bajaban los 1.000 chats cada 6 s y eso agotaba el egress de Supabase.
+  const [hasMoreChats, setHasMoreChats] = useState(true);
+  const [loadingMoreChats, setLoadingMoreChats] = useState(false);
+  const chatsRef = useRef<ChatRecord[]>([]);
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+  const loadingMoreRef = useRef(false);
+
+  // Filtros que se resuelven en el servidor (búsqueda, bot on/off, etiqueta).
+  const chatQuery = useMemo(() => {
+    const q = new URLSearchParams({ businessId });
+    const term = search.trim();
+    if (term) q.set("q", term);
+    if (filterType === "bot_on") q.set("agent_active", "1");
+    else if (filterType === "bot_off") q.set("agent_active", "0");
+    else if (filterType !== "all") q.set("tag", filterType);
+    return q.toString();
+  }, [businessId, search, filterType]);
+
+  const fetchChats = (extra: Record<string, string | number>) =>
+    api<{ chats: ChatRecord[] }>(`/api/chats?${chatQuery}&${new URLSearchParams(Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, String(v)]))).toString()}`);
+
+  // Mezcla chats recibidos con los ya cargados (reemplaza por teléfono) y reordena por actividad.
+  const mergeChats = (incoming: ChatRecord[]) => {
+    if (!incoming.length) return;
+    setChats((current) => {
+      const byPhone = new Map(current.map((chat) => [chat.phone_number, chat]));
+      for (const chat of incoming) byPhone.set(chat.phone_number, chat);
+      return Array.from(byPhone.values()).sort((a, b) => Number(b.updated_at) - Number(a.updated_at));
+    });
+  };
+
   async function refreshChats() {
     const [chatData, tagData] = await Promise.all([
-      api<{ chats: ChatRecord[] }>(`/api/chats?businessId=${encodeURIComponent(businessId)}`),
+      fetchChats({ limit: Math.max(CHAT_PAGE_SIZE, chatsRef.current.length) }),
       api<{ tags: TagRecord[] }>(`/api/tags?businessId=${encodeURIComponent(businessId)}`),
     ]);
     setChats(chatData.chats);
+    setHasMoreChats(chatData.chats.length >= CHAT_PAGE_SIZE);
     setTags(tagData.tags);
-    setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
   }
 
   async function refreshMessages(phoneNumber: string) {
-    const data = await api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(phoneNumber)}`);
+    const data = await api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(phoneNumber)}&limit=${MESSAGES_PAGE_SIZE}`);
     setMessages(data.messages);
     setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
   }
 
+  // Siguiente página de chats (los anteriores al más viejo que ya está en pantalla).
+  async function loadMoreChats() {
+    if (loadingMoreRef.current || !hasMoreChats) return;
+    const oldest = chatsRef.current.reduce((min, chat) => Math.min(min, Number(chat.updated_at)), Number.POSITIVE_INFINITY);
+    if (!Number.isFinite(oldest)) return;
+    loadingMoreRef.current = true;
+    setLoadingMoreChats(true);
+    try {
+      const data = await fetchChats({ before: oldest, limit: CHAT_PAGE_SIZE });
+      mergeChats(data.chats);
+      setHasMoreChats(data.chats.length >= CHAT_PAGE_SIZE);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Error al cargar más chats");
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMoreChats(false);
+    }
+  }
+
+  function handleChatListScroll(event: UIEvent<HTMLDivElement>) {
+    const el = event.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) void loadMoreChats();
+  }
+
+  // Carga inicial de la lista (y cada vez que cambia la búsqueda o el filtro), más etiquetas.
   useEffect(() => {
     let active = true;
-    const refresh = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
+    const delay = window.setTimeout(() => {
       Promise.all([
-        api<{ chats: ChatRecord[] }>(`/api/chats?businessId=${encodeURIComponent(businessId)}`),
+        fetchChats({ limit: CHAT_PAGE_SIZE }),
         api<{ tags: TagRecord[] }>(`/api/tags?businessId=${encodeURIComponent(businessId)}`),
       ]).then(([chatData, tagData]) => {
         if (!active) return;
         setChats(chatData.chats);
+        setHasMoreChats(chatData.chats.length >= CHAT_PAGE_SIZE);
         setTags(tagData.tags);
-        setSelectedPhone((current) => current && chatData.chats.some((chat) => chat.phone_number === current) ? current : null);
       }).catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    }, search.trim() ? 300 : 0);
+    return () => {
+      active = false;
+      window.clearTimeout(delay);
     };
-    void refresh();
-    const timer = window.setInterval(refresh, 6_000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatQuery]);
+
+  // Refresco en vivo: cada 10 s solo los chats que cambiaron; cada 2 min la lista cargada completa
+  // (por si algo cambió sin mover la fecha de actividad).
+  useEffect(() => {
+    let active = true;
+    let ticks = 0;
+    const refresh = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      ticks += 1;
+      const loaded = chatsRef.current;
+      const newest = loaded.reduce((max, chat) => Math.max(max, Number(chat.updated_at)), 0);
+      const full = ticks % 12 === 0 || !newest;
+      const request = full
+        ? fetchChats({ limit: Math.max(CHAT_PAGE_SIZE, loaded.length) })
+        : fetchChats({ since: newest, limit: CHAT_PAGE_SIZE });
+      request.then((data) => {
+        if (!active) return;
+        if (full) {
+          setChats(data.chats);
+          setHasMoreChats(data.chats.length >= CHAT_PAGE_SIZE);
+        } else {
+          mergeChats(data.chats);
+        }
+      }).catch(() => undefined);
+    };
+    const timer = window.setInterval(refresh, CHAT_POLL_MS);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -192,23 +286,51 @@ export function MessagesModule({ businessId }: { businessId: string }) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [businessId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatQuery]);
 
+  // Si se abre un chat que no está en la lista (por ejemplo desde el link ?chat=), se trae ese solo.
+  useEffect(() => {
+    if (!selectedPhone || chatsRef.current.some((chat) => chat.phone_number === selectedPhone)) return;
+    let active = true;
+    api<{ chats: ChatRecord[] }>(`/api/chats?businessId=${encodeURIComponent(businessId)}&phone=${encodeURIComponent(selectedPhone)}&limit=1`)
+      .then((data) => active && mergeChats(data.chats))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId, selectedPhone]);
+
+  // Conversación abierta: se carga una vez y después se piden solo los mensajes nuevos.
   useEffect(() => {
     if (!selectedPhone) return;
     let active = true;
-    const refresh = () => {
+    let latest = 0;
+    const base = `/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(selectedPhone)}`;
+    const apply = (data: { messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }, replace: boolean) => {
+      if (!active) return;
+      setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
+      if (replace) {
+        setMessages(data.messages);
+      } else if (data.messages.length) {
+        setMessages((current) => {
+          const seen = new Set(current.map((item) => item.id));
+          const fresh = data.messages.filter((item) => !seen.has(item.id));
+          return fresh.length ? [...current, ...fresh] : current;
+        });
+      }
+      for (const item of data.messages) latest = Math.max(latest, Number(item.created_at));
+    };
+    const refresh = (replace = false) => {
       if (typeof document !== "undefined" && document.hidden) return;
-      api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(`/api/messages?businessId=${encodeURIComponent(businessId)}&phone_number=${encodeURIComponent(selectedPhone)}`)
-        .then((data) => {
-          if (!active) return;
-          setMessages(data.messages);
-          setReplyWindow({ checked: true, canReply: data.reply_window.can_reply, lastInboundAt: data.reply_window.last_inbound_at });
-        })
+      const query = !replace && latest ? `${base}&after=${latest}` : `${base}&limit=${MESSAGES_PAGE_SIZE}`;
+      api<{ messages: MessageRecord[]; reply_window: { can_reply: boolean; last_inbound_at: number | null } }>(query)
+        .then((data) => apply(data, replace || !latest))
         .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar mensajes"));
     };
-    void refresh();
-    const timer = window.setInterval(refresh, 4_000);
+    refresh(true);
+    const timer = window.setInterval(() => refresh(), MESSAGES_POLL_MS);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") refresh();
     };
@@ -561,8 +683,8 @@ export function MessagesModule({ businessId }: { businessId: string }) {
             ))}
           </div>
 
-          {/* Lista de Conversaciones */}
-          <div className="k-wa-chat-list">
+          {/* Lista de Conversaciones: carga más chats a medida que se scrollea */}
+          <div className="k-wa-chat-list" onScroll={handleChatListScroll}>
             {filteredChats.map((chat) => {
               const isSelected = selectedPhone === chat.phone_number;
               return (
@@ -607,11 +729,17 @@ export function MessagesModule({ businessId }: { businessId: string }) {
               );
             })}
 
-            {!filteredChats.length && (
+            {!filteredChats.length && !loadingMoreChats && (
               <div className="k-wa-empty-list">
                 <span><MessageCircle size={26} aria-hidden /></span>
                 <p>No se encontraron conversaciones con este filtro.</p>
               </div>
+            )}
+
+            {filteredChats.length > 0 && hasMoreChats && (
+              <button type="button" className="k-wa-load-more" onClick={() => void loadMoreChats()} disabled={loadingMoreChats}>
+                {loadingMoreChats ? "Cargando más chats…" : "Cargar chats anteriores"}
+              </button>
             )}
           </div>
         </aside>
