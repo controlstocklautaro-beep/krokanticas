@@ -48,9 +48,10 @@ import {
 
 type Section = "overview" | "messages" | "contacts" | "handoffs" | "stock" | "kitchen" | "finances" | "settings" | "users";
 
-// Comandas: el panel solo trae los últimos días (el historial completo pesaba 2 MB por refresco).
-const KITCHEN_HISTORY_DAYS = 7;
+// Comandas: el panel trae solo el mes que se está mirando (el historial completo pesaba 2 MB por refresco)
+// y, en el mes actual, refresca cada 20 s únicamente los pedidos de los últimos días.
 const KITCHEN_POLL_MS = 20_000;
+const KITCHEN_POLL_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 type UserRole = "owner" | "admin" | "manager" | "reception" | "cashier" | "staff";
 type Business = { id: string; name: string; modules: string[] };
 type Product = { id: string; name: string; description?: string | null; price: number; aliases: string[]; active: number; stock_status: "available" | "limited" | "soldout"; stock_quantity: number | null; made_to_order: boolean; requires_human?: boolean };
@@ -1220,6 +1221,15 @@ function formatMonthLabel(monthKey: string): string {
   return monthKey === current ? `${name} ${year} (Mes actual)` : `${name} ${year}`;
 }
 
+// URL de comandas para un mes ("2026-10") o "all": del día 1 a las 00:00 al día 1 del mes siguiente, hora local.
+function kitchenOrdersUrl(businessId: string, monthKey: string): string {
+  if (monthKey === "all") return `/api/kitchen/orders?businessId=${businessId}&days=all`;
+  const [year, month] = monthKey.split("-").map(Number);
+  const from = new Date(year, month - 1, 1).getTime();
+  const to = new Date(year, month, 1).getTime();
+  return `/api/kitchen/orders?businessId=${businessId}&from=${from}&to=${to}`;
+}
+
 function KitchenModule({ businessId }: { businessId: string }) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -1235,11 +1245,14 @@ function KitchenModule({ businessId }: { businessId: string }) {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [kitchenPage, setKitchenPage] = useState(1);
   const [kitchenPageSize, setKitchenPageSize] = useState(10);
+  // Mes cuyas comandas ya llegaron: mientras no coincida con el elegido, se muestra "Cargando pedidos…".
+  const [loadedMonth, setLoadedMonth] = useState<string | null>(null);
+  const loadingOrders = loadedMonth !== selectedMonth;
 
   async function reload() {
     try {
       const [orderData, contactData, productData] = await Promise.all([
-        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&days=${KITCHEN_HISTORY_DAYS}`),
+        api<{ orders: Order[] }>(kitchenOrdersUrl(businessId, selectedMonth)),
         api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
         api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
       ]);
@@ -1251,33 +1264,56 @@ function KitchenModule({ businessId }: { businessId: string }) {
     }
   }
 
+  // Contactos y productos: una vez al abrir el módulo.
   useEffect(() => {
     let active = true;
-    const fetchAll = () =>
-      Promise.all([
-        api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&days=${KITCHEN_HISTORY_DAYS}`),
-        api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
-        api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
-      ])
-        .then(([orderData, contactData, productData]) => {
-          if (!active) return;
-          setOrders(orderData.orders);
-          setContacts(contactData.contacts);
-          setProducts(productData.products.filter((product) => product.active));
-        })
-        .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    Promise.all([
+      api<{ contacts: Contact[] }>(`/api/contacts?businessId=${businessId}`),
+      api<{ products: Product[] }>(`/api/stock?businessId=${businessId}`),
+    ])
+      .then(([contactData, productData]) => {
+        if (!active) return;
+        setContacts(contactData.contacts);
+        setProducts(productData.products.filter((product) => product.active));
+      })
+      .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"));
+    return () => {
+      active = false;
+    };
+  }, [businessId]);
+
+  // Comandas: se cargan las del mes elegido. Solo el mes actual se refresca en vivo, y de él solo se
+  // vuelven a pedir los pedidos de los últimos días (los más viejos del mes quedan como estaban).
+  useEffect(() => {
+    let active = true;
+    api<{ orders: Order[] }>(kitchenOrdersUrl(businessId, selectedMonth))
+      .then((orderData) => {
+        if (!active) return;
+        setOrders(orderData.orders);
+      })
+      .catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "Error al cargar"))
+      .finally(() => active && setLoadedMonth(selectedMonth));
+
+    if (selectedMonth !== getCurrentMonthKey()) {
+      return () => {
+        active = false;
+      };
+    }
 
     const pollOrders = () => {
       if (typeof document !== "undefined" && document.hidden) return;
-      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&days=${KITCHEN_HISTORY_DAYS}`)
+      const from = Date.now() - KITCHEN_POLL_WINDOW_MS;
+      api<{ orders: Order[] }>(`/api/kitchen/orders?businessId=${businessId}&from=${from}`)
         .then((orderData) => {
           if (!active) return;
-          setOrders(orderData.orders);
+          setOrders((current) => [
+            ...orderData.orders,
+            ...current.filter((order) => Number(order.created_at) < from),
+          ]);
         })
         .catch(() => undefined);
     };
 
-    void fetchAll();
     // Actualización automática cada 20 segundos solo cuando la pestaña está visible
     // (antes era cada 8 s con el historial completo: agotaba la transferencia de Vercel)
     const timer = setInterval(pollOrders, KITCHEN_POLL_MS);
@@ -1290,7 +1326,7 @@ function KitchenModule({ businessId }: { businessId: string }) {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [businessId]);
+  }, [businessId, selectedMonth]);
 
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
@@ -1549,6 +1585,9 @@ function KitchenModule({ businessId }: { businessId: string }) {
         </div>
 
         <div className="k-month-stats">
+          {loadingOrders && (
+            <span className="k-month-stat-chip">Cargando pedidos…</span>
+          )}
           <span className="k-month-stat-chip">
             Total: <strong>{monthMetrics.totalOrders}</strong>
           </span>

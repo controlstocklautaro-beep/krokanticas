@@ -177,10 +177,17 @@ export async function consolidateDuplicateOrders(businessId: string, force = fal
 
 // Ventana por defecto del listado: solo pedidos recientes. El historial completo pesaba 2 MB y tardaba
 // un minuto por llamada, y el panel lo pedía cada 8 segundos (eso agotó la cuota de Vercel). Los flujos
-// de n8n miran como mucho 24 h hacia atrás; el panel pide 7 días; `days=all` devuelve todo.
+// de n8n miran como mucho 24 h hacia atrás; el panel pide el mes que se está mirando (from/to).
 export const DEFAULT_ORDER_WINDOW_DAYS = 2;
 
-export async function listKitchenOrders(businessId: string, status?: string | null, days: number | "all" = DEFAULT_ORDER_WINDOW_DAYS) {
+/** Rango de fechas de creación (ms, `from` inclusivo y `to` exclusivo) o "all" para todo el historial. */
+export type OrderRange = { from?: number; to?: number } | "all";
+
+export async function listKitchenOrders(
+  businessId: string,
+  status?: string | null,
+  range: OrderRange = { from: Date.now() - DEFAULT_ORDER_WINDOW_DAYS * 24 * 60 * 60 * 1000 },
+) {
   await consolidateDuplicateOrders(businessId).catch(() => undefined);
   const db = getD1();
   let filter = "";
@@ -191,9 +198,15 @@ export async function listKitchenOrders(businessId: string, status?: string | nu
     filter = " AND status = ?";
     params.push(status);
   }
-  if (days !== "all") {
-    filter += " AND created_at >= ?";
-    params.push(Date.now() - days * 24 * 60 * 60 * 1000);
+  if (range !== "all") {
+    if (range.from !== undefined) {
+      filter += " AND created_at >= ?";
+      params.push(range.from);
+    }
+    if (range.to !== undefined) {
+      filter += " AND created_at < ?";
+      params.push(range.to);
+    }
   }
   const query = `SELECT id, contact_id, order_number, customer_name, phone_number, delivery_type, address, zone, payment_method, scheduled_time, subtotal, shipping_cost, total, status, receipt_url, notes, created_at, updated_at FROM orders WHERE business_id = ?${filter} ORDER BY created_at DESC`;
   const orders = await db.prepare(query).bind(...params).all<Record<string, unknown>>();
